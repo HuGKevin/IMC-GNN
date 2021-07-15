@@ -227,3 +227,16 @@ for epoch in range(1, 51):
     test_acc = test(test_loader)
     tracker.append([epoch, train_acc, test_acc])
     print(f"Epoch: {epoch:03d}, Train Acc: {train_acc:.4f}, Test Acc: {test_acc:.4f}")
+
+# Visualize results
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+
+test_line, = plt.plot(range(1,51), [a[2] for a in tracker], label = "Test Accuracy")
+train_line, = plt.plot(range(1,51), [a[1] for a in tracker], label = "Training Accuracy")
+plt.axis([1, 50, 0, 1])
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.title("GNN Training on Subgraphs by CK Expression, lr = 0.01")
+plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
+plt.show()
