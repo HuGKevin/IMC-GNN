@@ -1,7 +1,7 @@
 import pandas, numpy, torch
 from pandas.core.frame import DataFrame
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, splitext
 from torch.utils.data import dataloader
 from torch_geometric.data import Data, Dataset, DataLoader, batch
 from torch_geometric.data.in_memory_dataset import InMemoryDataset
@@ -57,7 +57,7 @@ class c1Data(InMemoryDataset):
                 dataset.append(Data(x = vertex_tensor, 
                                     edge_index = edge_tensor, 
                                     y = torch.tensor([int(label == "DCB")]), 
-                                    name = os.path.splitext(file)[0]))
+                                    name = splitext(file)[0]))
 
         data, slices = self.collate(dataset)
         torch.save((data, slices), self.processed_paths[0])
