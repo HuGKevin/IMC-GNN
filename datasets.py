@@ -5,6 +5,7 @@ from os.path import isfile, join, splitext
 from torch.utils.data import dataloader
 from torch_geometric.data import Data, Dataset, DataLoader, batch
 from torch_geometric.data.in_memory_dataset import InMemoryDataset
+from torch_geometric.nn.pool import radius
 from torch_geometric.utils import to_networkx, from_networkx, subgraph
 import networkx as nx
 
@@ -106,12 +107,12 @@ class c2Data(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0])
 
 # Constructs subgraphs of c1 dataset based on highest CK expression.
-# Takes arguments radius = width of neighborhood; depth = how many neighborhoods to take.
+# Takes arguments radius = width of neighborhood; depth = how many neighborhoods to take. Note: can't seem to properly implement these arguments.
 class c1_ck_subgraphs(InMemoryDataset):
-    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None, radius = 5, depth = 10):
+    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
         super(c1_ck_subgraphs, self).__init__(root, transform, pre_transform, pre_filter)
-        self.radius = radius
-        self.depth = depth
+        # self.radius = radius
+        # self.depth = depth
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
@@ -123,7 +124,8 @@ class c1_ck_subgraphs(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return [f'c1_ck_r{self.radius}_d{self.depth}_subgraphs.data']
+        # name = f"c1_ck_r{self.radius}_d{self.depth}_subgraphs.data"
+        return ["c1_ck_subgraphs.data"]
 
     def download(self):
         # Leave this empty?
@@ -146,11 +148,11 @@ class c1_ck_subgraphs(InMemoryDataset):
             results = DataFrame(columns = ['Max_node', 'Max_PANCK', 'Neighborhood_nodes'])
 
             # Identify the nodes in each one
-            for j in range(0, self.depth):
+            for j in range(0, 10):
                 max_node = panck_ranks.index[panck_ranks.panck.argmax()]
                 max_panck = panck_ranks.panck[max_node]
                 subgraphlist = [max_node]
-                for i in range(0, self.radius):
+                for i in range(0, 5):
                     subgraphlist.extend(neighborhood(nx_data, max_node, i + 1))
                 panck_ranks = panck_ranks.drop(subgraphlist, errors = 'ignore')
                 # panck_ranks.drop([i for i,x in enumerate(panck_ranks.index) if x in subgraphlist])
