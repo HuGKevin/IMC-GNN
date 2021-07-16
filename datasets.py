@@ -185,3 +185,88 @@ def neighborhood(G, node, n):
     path_lengths = nx.single_source_dijkstra_path_length(G, node)
     return [node for node, length in path_lengths.items()
                     if length == n]
+
+class c1_area_subgraphs(InMemoryDataset):
+    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
+        super(c1_area_subgraphs, self).__init__(root, transform, pre_transform, pre_filter)
+        self.data, self.slices = torch.load(self.processed_paths[0])
+
+    @property
+    def raw_file_names(self):
+        folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c1/"
+        labels = ['DCB', 'NDB']
+        names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
+        return names
+
+    @property
+    def processed_file_names(self):
+        return ['c1_area_subgraphs.data']
+
+    def download(self):
+        # Leave this empty?
+        return []
+
+    def process(self):
+        folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c1/"
+        labels = ['DCB', 'NDB']
+        dataset = []
+
+        # Data are split into responders (DCB) and nonresponders (NDB)
+        for label in labels:
+            folderpath = join(folder, label)
+            for file in listdir(folderpath):
+                pointer = pandas.read_csv(join(folderpath, file)) # Read in the data
+                xmin = pointer.X_position.min()
+                ymin = pointer.Y_position.min()
+                x_width = (pointer.X_position.max() - pointer.X_position.min()) / 5
+                y_width = (pointer.Y_position.max() - pointer.Y_position.min()) / 5
+                x = [xmin + i * x_width for i in range(0, 6)]
+                y = [ymin + i * y_width for i in range(0, 6)]
+                # Thirteen windows in a pyramid shape around the center one.
+                # Each item is a window in the format [x_min, x_max, y_min, y_max]
+                windows = [[x[2], x[3], y[0], y[1]],
+                           [x[1], x[2], y[1], y[2]],
+                           [x[2], x[3], y[1], y[2]],
+                           [x[3], x[4], y[1], y[2]],
+                           [x[0], x[1], y[2], y[3]],
+                           [x[1], x[2], y[2], y[3]], 
+                           [x[2], x[3], y[2], y[3]],
+                           [x[3], x[4], y[2], y[3]],
+                           [x[4], x[5], y[2], y[3]],
+                           [x[1], x[2], y[3], y[4]],
+                           [x[2], x[3], y[3], y[4]],
+                           [x[3], x[4], y[3], y[4]],
+                           [x[2], x[3], y[4], y[5]]]
+
+                for p in range(0, len(windows)):
+                    window = windows[p]
+                    pointer_window = pointer[(pointer.X_position > window[0]) & 
+                                             (pointer.X_position < window[1]) & 
+                                             (pointer.Y_position > window[2]) & 
+                                             (pointer.Y_position < window[3])]
+
+                    window_neigh = pointer_window.iloc[:, 48:pointer_window.shape[1]]
+                    window_cellid = pointer_window.iloc[:,1]
+                    window_preadj = pandas.concat([window_cellid, window_neigh], axis = 1)
+                    w12 = window_preadj.melt(id_vars = "CellId", value_vars = window_preadj.columns[1:], var_name = "NeighbourNumber", value_name = "NeighbourId") # Convert to two-column edges
+                    w13 = w12[w12.NeighbourId != 0].drop('NeighbourNumber', axis = 1) # Drop the empty edges
+                    w14 = w13[w13.NeighbourId.isin(w13.CellId)] # Drop edges that go to nodes not in the window
+                      # Reindex the edges such that they match node dimensions
+                    unique_nodes = numpy.unique(w14.CellId.tolist()) 
+                    for i,x in enumerate(unique_nodes):
+                        for q in range(0, w14.shape[0]): # Need to figure out how to suppress warnings here, or at least understand the warning.
+                            if w14.iloc[q,0] == x:
+                                w14.iloc[q,0] = i
+                            if w14.iloc[q,1] == x:
+                                w14.iloc[q,1] = i
+
+                    colnames = pointer_window.columns[2:35]
+                    node_tensor = torch.tensor(pointer_window.loc[:, colnames].values, dtype = torch.double)
+                    edge_tensor = torch.tensor(w14.transpose().values)
+                    dataset.append(Data(x = node_tensor, 
+                                        edge_index = edge_tensor,
+                                        y = torch.tensor([int(label == "DCB")]),
+                                        name = splitext(file)[0] + f"_area{p}"))
+
+        data, slices = self.collate(dataset)
+        torch.save((data, slices), self.processed_paths[0])
