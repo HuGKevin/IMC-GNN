@@ -9,6 +9,8 @@ from torch_geometric.nn.pool import radius
 from torch_geometric.utils import to_networkx, from_networkx, subgraph
 import networkx as nx
 
+pandas.options.mode.chained_assignment = None
+
 # Loads data from c1 dataset
 class c1Data(InMemoryDataset):
     def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
@@ -251,7 +253,7 @@ class c1_area_subgraphs(InMemoryDataset):
                     w12 = window_preadj.melt(id_vars = "CellId", value_vars = window_preadj.columns[1:], var_name = "NeighbourNumber", value_name = "NeighbourId") # Convert to two-column edges
                     w13 = w12[w12.NeighbourId != 0].drop('NeighbourNumber', axis = 1) # Drop the empty edges
                     w14 = w13[w13.NeighbourId.isin(w13.CellId)] # Drop edges that go to nodes not in the window
-                      # Reindex the edges such that they match node dimensions
+                    # Reindex the edges such that they match node dimensions
                     unique_nodes = numpy.unique(w14.CellId.tolist()) 
                     for i,x in enumerate(unique_nodes):
                         for q in range(0, w14.shape[0]): # Need to figure out how to suppress warnings here, or at least understand the warning.
