@@ -272,3 +272,72 @@ for epoch in range(1, 51):
     test_acc = test(test_loader)
     tracker6.append([epoch, train_acc, test_acc])
     print(f"Epoch: {epoch:03d}, Train Acc: {train_acc:.4f}, Test Acc: {test_acc:.4f}")
+
+#### Visualization of results
+import matplotlib.pyplot as plt
+
+# Original c1, lr = 0.01
+train_line, = plt.plot([x[0] for x in tracker1], [x[1] for x in tracker1], label = "Training Accuracy")
+test_line, = plt.plot([x[0] for x in tracker1], [x[2] for x in tracker1], label = "Test Accuracy")
+plt.axis([1, 50, 0, 1])
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
+plt.title('GNN Performance on c1 Data, LR = 0.01')
+plt.savefig('c1whole_lr01.png')
+plt.clf()
+
+# Original c1, lr = 0.005 
+train_line, = plt.plot([x[0] for x in tracker2], [x[1] for x in tracker2], label = "Training Accuracy")
+test_line, = plt.plot([x[0] for x in tracker2], [x[2] for x in tracker2], label = "Test Accuracy")
+plt.axis([1, 50, 0, 1])
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
+plt.title('GNN Performance on c1 Data, LR = 0.005')
+plt.savefig('c1whole_lr005.png')
+plt.clf()
+
+# Subgraph by CK, lr = 0.01
+train_line, = plt.plot([x[0] for x in tracker3], [x[1] for x in tracker3], label = "Training Accuracy")
+test_line, = plt.plot([x[0] for x in tracker3], [x[2] for x in tracker3], label = "Test Accuracy")
+plt.axis([1, 50, 0, 1])
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
+plt.title('GNN Performance on c1 CK subgraphs, LR = 0.01')
+plt.savefig('c1ck_lr01.png')
+plt.clf()
+
+# Subgraph by CK, lr = 0.05
+train_line, = plt.plot([x[0] for x in tracker4], [x[1] for x in tracker4], label = "Training Accuracy")
+test_line, = plt.plot([x[0] for x in tracker4], [x[2] for x in tracker4], label = "Test Accuracy")
+plt.axis([1, 50, 0, 1])
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
+plt.title('GNN Performance on c1 CK subgraphs, LR = 0.005')
+plt.savefig('c1ck_lr005.png')
+plt.clf()
+
+# Subgraph by area, lr = 0.01
+train_line, = plt.plot([x[0] for x in tracker5], [x[1] for x in tracker5], label = "Training Accuracy")
+test_line, = plt.plot([x[0] for x in tracker5], [x[2] for x in tracker5], label = "Test Accuracy")
+plt.axis([1, 50, 0, 1])
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
+plt.title('GNN Performance on c1 area subgraphs, LR = 0.01')
+plt.savefig('c1area_lr01.png')
+plt.clf()
+
+# Subgraph by area, lr = 0.05
+train_line, = plt.plot([x[0] for x in tracker6], [x[1] for x in tracker6], label = "Training Accuracy")
+test_line, = plt.plot([x[0] for x in tracker6], [x[2] for x in tracker6], label = "Test Accuracy")
+plt.axis([1, 50, 0, 1])
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
+plt.title('GNN Performance on c1 area subgraphs, LR = 0.005')
+plt.savefig('c1area_lr005.png')
+plt.clf()
