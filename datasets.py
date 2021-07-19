@@ -110,11 +110,12 @@ class c2Data(InMemoryDataset):
 
 # Constructs subgraphs of c1 dataset based on highest CK expression.
 # Takes arguments radius = width of neighborhood; depth = how many neighborhoods to take. Note: can't seem to properly implement these arguments.
+# Bug fixed - turns out putting the instance variable definition before the inheritance call (super().__init__()) makes a difference. Not sure why.
 class c1_ck_subgraphs(InMemoryDataset):
-    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
+    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None, radius = 5, depth = 10):
+        self.radius = radius 
+        self.depth = depth 
         super(c1_ck_subgraphs, self).__init__(root, transform, pre_transform, pre_filter)
-        # self.radius = radius
-        # self.depth = depth
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
@@ -126,8 +127,8 @@ class c1_ck_subgraphs(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        # name = f"c1_ck_r{self.radius}_d{self.depth}_subgraphs.data"
-        return ["c1_ck_subgraphs.data"]
+        name = f"c1_ck_r{self.radius}_d{self.depth}_subgraphs.data"
+        return [name]
 
     def download(self):
         # Leave this empty?
@@ -150,11 +151,11 @@ class c1_ck_subgraphs(InMemoryDataset):
             results = DataFrame(columns = ['Max_node', 'Max_PANCK', 'Neighborhood_nodes'])
 
             # Identify the nodes in each one
-            for j in range(0, 10):
+            for j in range(0, self.depth):
                 max_node = panck_ranks.index[panck_ranks.panck.argmax()]
                 max_panck = panck_ranks.panck[max_node]
                 subgraphlist = [max_node]
-                for i in range(0, 5):
+                for i in range(0, self.radius):
                     subgraphlist.extend(neighborhood(nx_data, max_node, i + 1))
                 panck_ranks = panck_ranks.drop(subgraphlist, errors = 'ignore')
                 # panck_ranks.drop([i for i,x in enumerate(panck_ranks.index) if x in subgraphlist])
