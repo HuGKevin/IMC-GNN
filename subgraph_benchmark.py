@@ -341,3 +341,125 @@ plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
 plt.title('GNN Performance on c1 area subgraphs, LR = 0.005')
 plt.savefig('c1area_lr005.png')
 plt.clf()
+
+# Trying with significantly more epochs / smaller LR
+dataset = datasets.c1_ck_subgraphs()
+
+class GCN(torch.nn.Module):
+    def __init__(self, hidden_channels):
+        super(GCN, self).__init__()
+        self.conv1 = GCNConv(dataset.num_node_features, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, hidden_channels)
+        self.conv3 = GCNConv(hidden_channels, hidden_channels)
+        self.lin = Linear(hidden_channels, dataset.num_classes)
+
+    def forward(self, x, edge_index, batch):
+        # 1. Obtain node embeddings
+        x = self.conv1(x, edge_index)
+        x = x.relu()
+        x = self.conv2(x, edge_index)
+        x = x.relu()
+        x = self.conv3(x, edge_index)
+
+        # 2. Readout layer
+        x = global_mean_pool(x, batch) #[batch_size, hidden_channels]
+
+        # 3. Final classifier
+        x = F.dropout(x, p = 0.5, training = self.training)
+        x = self.lin(x)
+
+        return x
+
+torch.manual_seed(12345)
+test_index = []
+for j in [j for j in [randint(0, len(dataset)/10) for i in range(0, 4)]]:
+    test_index.extend([i for i in range(10 * j, 10 * j+10)])
+train_index = [i for i in range(0, len(dataset)) if i not in test_index]
+
+test_dataset = dataset[test_index]
+train_dataset = dataset[train_index]
+
+print(f"Number of test graphs: {len(test_dataset)}")
+print(f"Number of training graphs: {len(train_dataset)}")
+
+# Batching
+train_loader = DataLoader(train_dataset, batch_size = 10, shuffle = True)
+test_loader = DataLoader(test_dataset, batch_size = 10, shuffle = False)
+
+# Construct the model
+model = GCN(hidden_channels=16).double()
+print(model)
+
+# Training the model
+lr = 0.001
+optimizer = torch.optim.Adam(model.parameters(), lr = lr)
+criterion = torch.nn.CrossEntropyLoss()
+
+print(f"Learning rate = {lr}")
+tracker7 = []
+for epoch in range(1, 1001):
+    train()
+    train_acc = test(train_loader)
+    test_acc = test(test_loader)
+    tracker7.append([epoch, train_acc, test_acc])
+    print(f"Epoch: {epoch:03d}, Train Acc: {train_acc:.4f}, Test Acc: {test_acc:.4f}")
+
+train_line, = plt.plot([x[0] for x in tracker7], [x[1] for x in tracker7], label = "Training Accuracy")
+test_line, = plt.plot([x[0] for x in tracker7], [x[2] for x in tracker7], label = "Test Accuracy")
+plt.axis([1, 1000, 0, 1])
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
+plt.title('GNN Performance on c1 CK subgraphs, LR = 0.001')
+plt.savefig('c1ck_lr001.png')
+plt.clf()
+# So we're egregiously overfitting, but getting occasional peaks in the test accuracy. 
+# I'm going to try using a much smaller learning rate and seeing how that affects it. 
+
+# Small LR, big epoch
+torch.manual_seed(12345)
+test_index = []
+for j in [j for j in [randint(0, len(dataset)/10) for i in range(0, 4)]]:
+    test_index.extend([i for i in range(10 * j, 10 * j+10)])
+train_index = [i for i in range(0, len(dataset)) if i not in test_index]
+
+test_dataset = dataset[test_index]
+train_dataset = dataset[train_index]
+
+print(f"Number of test graphs: {len(test_dataset)}")
+print(f"Number of training graphs: {len(train_dataset)}")
+
+# Batching
+train_loader = DataLoader(train_dataset, batch_size = 10, shuffle = True)
+test_loader = DataLoader(test_dataset, batch_size = 10, shuffle = False)
+
+# Construct the model
+model = GCN(hidden_channels=16).double()
+print(model)
+
+# Training the model
+lr = 0.0001
+optimizer = torch.optim.Adam(model.parameters(), lr = lr)
+criterion = torch.nn.CrossEntropyLoss()
+
+print(f"Learning rate = {lr}")
+tracker8 = []
+for epoch in range(1, 5001):
+    train()
+    train_acc = test(train_loader)
+    test_acc = test(test_loader)
+    tracker8.append([epoch, train_acc, test_acc])
+    print(f"Epoch: {epoch:03d}, Train Acc: {train_acc:.4f}, Test Acc: {test_acc:.4f}")
+
+train_line, = plt.plot([x[0] for x in tracker8], [x[1] for x in tracker8], label = "Training Accuracy")
+test_line, = plt.plot([x[0] for x in tracker8], [x[2] for x in tracker8], label = "Test Accuracy")
+plt.axis([1, 5000, 0, 1])
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend([train_line, test_line], ["Training Accuracy", 'Test Accuracy'])
+plt.title('GNN Performance on c1 CK subgraphs, LR = 0.0001')
+plt.savefig('c1ck_lr0001.png')
+plt.clf()
+# Smaller LR hits a much higher test accuracy that plateaus around 500 epochs. 
+# would it be neneficial to continue tuning the LR? Or perhaps implementing a CV strategy here would be better. 
+# Could also consider what happens if we don't restrict our datasplits along patient identity. 
