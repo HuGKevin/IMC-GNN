@@ -302,7 +302,7 @@ class c1_naive_neighbors(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return ['c1_naive_neighbors.data']
+        return [f'c1_naive_neighbors_r{self.radius}.data']
 
     def download(self):
         # Leave this empty?
