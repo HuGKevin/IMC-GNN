@@ -8,6 +8,7 @@ from torch_geometric.data.in_memory_dataset import InMemoryDataset
 from torch_geometric.nn.pool import radius
 from torch_geometric.utils import to_networkx, from_networkx, subgraph
 import networkx as nx
+from itertools import product
 
 pandas.options.mode.chained_assignment = None
 
@@ -281,6 +282,68 @@ class c1_area_subgraphs(InMemoryDataset):
                                         y = torch.tensor([int(label == "DCB")]),
                                         pos = pos_tensor,
                                         name = splitext(file)[0] + f"_area{p}"))
+
+        data, slices = self.collate(dataset)
+        torch.save((data, slices), self.processed_paths[0])
+
+
+class c1_naive_neighbors(InMemoryDataset):
+    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None,radius = 25):
+        self.radius = radius
+        super(c1_naive_neighbors, self).__init__(root, transform, pre_transform, pre_filter)
+        self.data, self.slices = torch.load(self.processed_paths[0])
+
+    @property
+    def raw_file_names(self):
+        folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c1/"
+        labels = ['DCB', 'NDB']
+        names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
+        return names
+
+    @property
+    def processed_file_names(self):
+        return ['c1_naive_neighbors.data']
+
+    def download(self):
+        # Leave this empty?
+        return []
+
+    def process(self):
+        folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c1/"
+        labels = ['DCB', 'NDB']
+        dataset = []
+
+        # Data are split into responders (DCB) and nonresponders (NDB)
+        for label in labels:
+            folderpath = join(folder, label)
+            for file in listdir(folderpath):
+                pointer = pandas.read_csv(join(folderpath, file)) # Read in the data
+                computer = pointer[["CellId", "X_position", "Y_position"]]
+                computer.loc[0:,"neighbors"] = numpy.nan # Can ignore the value warning.
+                computer['neighbors'] = computer['neighbors'].astype(object) # So the column accepts list objects
+                for i in range(0, computer.shape[0]):
+                    x_i = computer.iloc[i, 1]
+                    y_i = computer.iloc[i, 2]
+                    nbd = (computer.X_position - x_i) ** 2 + (computer.Y_position - y_i) ** 2 < self.radius ** 2 # All the neighbors within radius of indexed cell
+                    nbd = list(computer.loc[[i for i, x in enumerate(nbd) if x], ["CellId"]].CellId) # Find indices of those neighbors
+                    computer.at[i, 'neighbors'] = nbd
+                    
+                # Now I have to convert it to a list of pairs. 
+                neighborlist = []
+                for index, cell in computer.iterrows():
+                    neighborlist.append([[cell.CellId, i] for i in cell.neighbors])
+                neighborlist = [item for sublist in neighborlist for item in sublist]
+                neighborlist = numpy.array([i for i in neighborlist if i[0] != i[1]])
+                
+                relcols = pointer.columns[2:35] # we need columns 2:34
+                vertex_tensor = torch.tensor(pointer.loc[:, relcols].values, dtype = torch.double)
+                edge_tensor = torch.tensor(neighborlist.transpose() - 1, dtype = torch.long) #names = ("CellId", "NeighbourId")) 
+                pos_tensor = torch.tensor(pointer.loc[:, ['X_position', 'Y_position']].values, dtype = torch.double)
+                dataset.append(Data(x = vertex_tensor, 
+                                    edge_index = edge_tensor, 
+                                    y = torch.tensor([int(label == "DCB")]), 
+                                    pos = pos_tensor,
+                                    name = splitext(file)[0]))
 
         data, slices = self.collate(dataset)
         torch.save((data, slices), self.processed_paths[0])
