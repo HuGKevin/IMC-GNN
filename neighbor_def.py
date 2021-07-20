@@ -5,13 +5,16 @@
 # 2. All cells within a fixed radius of a center cell
 # 3. Neighbors if the edges of the ellipses are within a certain distance of each other
 
+from networkx.generators import directed
 import pandas
 from os import listdir
 from os.path import isfile, join
 import torch
+import torch_geometric
 from torch_geometric.data import Data
 import matplotlib.pyplot as plt
 import numpy as np
+from torch_geometric.utils.convert import to_networkx
 
 # Load in all the data
 folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c1/"
@@ -37,8 +40,13 @@ for label in labels:
 
 # 2. Neighbor if within a fixed radius of center cell
 # Entire slide is has coordinates ranging from x in (60, 700) to y in (30, 700)
-
 radius = 25
+for label in labels:
+    folderpath = join(folder, label)
+    for file in listdir(folderpath):
+        pointer = pandas.read_csv(join(folderpath, file)) # Read in the data
+
+
 computer = pointer[["CellId", "X_position", "Y_position"]]
 computer.loc[0:,"neighbors"] = []
 computer['neighbors'] = computer['neighbors'].astype(object) # So the column accepts list objects
@@ -49,6 +57,15 @@ for i in range(0, computer.shape[0]):
     nbd = list(computer.loc[[i for i, x in enumerate(nbd) if x], ["CellId"]].CellId) # Find indices of those neighbors
     computer.at[i, 'neighbors'] = nbd
 # Now I have to convert it to a list of pairs. Or should i just convert to an adjacency matrix, since i'll be computing the laplacian and the fiedler valuek
+from itertools import product
+test = product(computer.neighbors[0], computer.neighbors[0])
+
+neighborlist = []
+for index, cell in computer.iterrows():
+    neighborlist.append([[cell.CellId, i] for i in cell.neighbors])
+neighborlist = [item for sublist in neighborlist for item in sublist]
+neighborlist = [i for i in neighborlist if i[0] != i[1]]
+
 
 
 # 3. Neighbor if edges of ellipses are within a certain distance of each other
@@ -90,5 +107,29 @@ axs[1].hist(min, bins = 10)
 axs[0].set_title("Major axes")
 axs[1].set_title("Minor axes")
 
+# Trying to get the graph laplacian and the Fiedler values
+import datasets
+from torch_geometric.utils import get_laplacian, to_networkx
 
-plt.show()
+dataset = datasets.c1Data()
+data = dataset[0]
+lap = get_laplacian(data.edge_index)
+
+from torch_geometric.transforms import LaplacianLambdaMax
+
+test = LaplacianLambdaMax()
+more = test(data)
+
+import networkx
+import scipy
+
+test = to_networkx(data, to_undirected=True)
+lap = networkx.laplacian_matrix(test).astype('double')
+scipy.sparse.linalg.eigs(lap)
+
+
+fied = networkx.fiedler_vector(test)
+bits = networkx.number_connected_components(test)
+for data in dataset:
+    ntkx = to_networkx(data, to_undirected = True)
+    networkx.number_connected_components(ntkx)
