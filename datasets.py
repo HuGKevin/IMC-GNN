@@ -53,9 +53,11 @@ class c1Data(InMemoryDataset):
                 relcols = pointer.columns[2:35] # we need columns 2:34
                 vertex_tensor = torch.tensor(pointer.loc[:, relcols].values, dtype = torch.double)
                 edge_tensor = torch.tensor(f13.transpose().values - 1) #names = ("CellId", "NeighbourId")) 
+                pos_tensor = torch.tensor(pointer.loc[:, ['X_position', 'Y_position']].values, dtype = torch.double)
                 dataset.append(Data(x = vertex_tensor, 
                                     edge_index = edge_tensor, 
                                     y = torch.tensor([int(label == "DCB")]), 
+                                    pos = pos_tensor,
                                     name = splitext(file)[0]))
 
         data, slices = self.collate(dataset)
@@ -103,7 +105,12 @@ class c2Data(InMemoryDataset):
                 relcols = pointer.columns[2:35] # we need columns 2:34
                 vertex_tensor = torch.tensor(pointer.loc[:, relcols].values, dtype = torch.double)
                 edge_tensor = torch.tensor(f13.transpose().values - 1) #names = ("CellId", "NeighbourId")) 
-                dataset.append(Data(x = vertex_tensor, edge_index = edge_tensor, y = torch.tensor([int(label == "DCB")])))
+                pos_tensor = torch.tensor(pointer.loc[:, ['X_position', 'Y_position']].values, dtype = torch.double)
+                dataset.append(Data(x = vertex_tensor, 
+                                    edge_index = edge_tensor, 
+                                    y = torch.tensor([int(label == "DCB")]),
+                                    pos = pos_tensor,
+                                    name = splitext(file)[0]))
 
         data, slices = self.collate(dataset)
         torch.save((data, slices), self.processed_paths[0])
@@ -172,10 +179,12 @@ class c1_ck_subgraphs(InMemoryDataset):
                             subgraph_edges[0,q] = i
                         if subgraph_edges[1,q] == x:
                             subgraph_edges[1,q] = i
+                subgraph_pos = pt_data.pos[results.Neighborhood_nodes[p],:]
                 subgraph_nodes = pt_data.x[results.Neighborhood_nodes[p],:]
                 subgraph_dataset.append(Data(x = subgraph_nodes,
                                             y = pt_data.y,
                                             edge_index = subgraph_edges,
+                                            pos = subgraph_pos,
                                             name = pt_data.name + '_Sub' + str(p)))
 
             print(f"Graph {k} of {len(dataset)} processed")
@@ -190,7 +199,7 @@ def neighborhood(G, node, n):
                     if length == n]
 
 class c1_area_subgraphs(InMemoryDataset):
-    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
+    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None,):
         super(c1_area_subgraphs, self).__init__(root, transform, pre_transform, pre_filter)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -266,9 +275,11 @@ class c1_area_subgraphs(InMemoryDataset):
                     colnames = pointer_window.columns[2:35]
                     node_tensor = torch.tensor(pointer_window.loc[:, colnames].values, dtype = torch.double)
                     edge_tensor = torch.tensor(w14.transpose().values)
+                    pos_tensor = torch.tensor(pointer.iloc[window_cellid - 1,].loc[:, ['X_position', 'Y_position']].values, dtype = torch.double)
                     dataset.append(Data(x = node_tensor, 
                                         edge_index = edge_tensor,
                                         y = torch.tensor([int(label == "DCB")]),
+                                        pos = pos_tensor,
                                         name = splitext(file)[0] + f"_area{p}"))
 
         data, slices = self.collate(dataset)
