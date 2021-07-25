@@ -55,8 +55,6 @@ class GCN_Train():
         batch = 1
         for data in train_DL:
             self.out = self.model(data.x, data.edge_index, data.batch) # torch.nn.Module is callable, and is defined to invoke forward(). 
-            print(self.out)
-            print(data.y)
             loss = self.criterion(self.out, data.y)
             loss.backward()
             self.optimizer.step()
@@ -120,7 +118,7 @@ class EarlyStopFlag():
     def update(self, new_value):
         print(f"=================Input value is {new_value}===============")
         self.auc_track.append(new_value)
-        print(f"self.count = {self.count}")
+        print(f"Epoch number {self.count + 1}")
 
         if self.count == 0:
             new_ema = new_value
