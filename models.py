@@ -35,7 +35,10 @@ class GCN(torch.nn.Module):
 
 # Class for trainer class
 class GCN_Train():
-    def __init__(self, input_dim, output_dim, hidden_channels, metrics = 'auc', lr = 0.001, loss_fxn = 'cel', optimizer = 'adam'):
+    def __init__(self, 
+                 input_dim, output_dim, hidden_channels, 
+                 metrics = 'auc', lr = 0.001, loss_fxn = 'cel', optimizer = 'adam',
+                 es_thresh = 0.03, es_lambda = 0.8, es_min_iter = 100):
         self.model = GCN(input_dim = input_dim, output_dim = output_dim, hidden_channels = hidden_channels).double()
         self.metric = metrics
         self.flagraiser = False
@@ -46,10 +49,14 @@ class GCN_Train():
         if optimizer == 'adam':
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr = lr)
 
-        self.flag = EarlyStopFlag(0.03, 0.8, 30)
+        self.flag = EarlyStopFlag(es_thresh, es_lambda, es_min_iter)
 
     # Trains model for one epoch
-    def train(self, train_DL, verbose = True):
+    def train(self, train_DL, verbose = False, ignore_es = False):
+        if self.flagraiser == True and ignore_es == False:
+            print("Early stopping triggered - are you sure you want to continue?")
+            return False
+
         self.model.train() # Puts model in training mode
 
         batch = 1
@@ -63,28 +70,13 @@ class GCN_Train():
                 print(f"Batch #{batch} complete")
                 batch += 1
 
-        pred = []
-        true = []
-
-        for data in train_DL:
-            pred.append(self.predict(data.x, data.edge_index, data.batch))
-            true.append(data.y)
-
-        final_pred = torch.cat(pred, dim = 0)
-        final_true = torch.cat(true, dim = 0)
-
-        self.flagraiser = self.flag.update(roc_auc_score(final_true, final_pred))
-
-    def fit(self, x, y):
-        return True
-    
-    def validate(self, valid_loader):
+    def validate(self, valid_DL, verbose = False):
         self.model.eval()
 
         pred = []
         true = []
 
-        for data in valid_loader:
+        for data in valid_DL:
             pred.append(self.predict(data.x, data.edge_index, data.batch))
             true.append(data.y)
 
@@ -93,6 +85,7 @@ class GCN_Train():
 
         if self.metric == 'auc':
             score = roc_auc_score(final_true, final_pred)
+            self.flagraiser = self.flag.update(score, verbose = verbose)
 
         return score
             
@@ -115,26 +108,35 @@ class EarlyStopFlag():
         self.__max_mode__=max_mode
         self.__name__ = name if name is not None else "Metric." + str(np.random.randint(10000))
 
-    def update(self, new_value):
-        print(f"=================Input value is {new_value}===============")
+    def update(self, new_value, verbose = False):
+        if verbose == True:
+            print("========Early Stopping========")
+
         self.auc_track.append(new_value)
-        print(f"Epoch number {self.count + 1}")
+        
+        if verbose == True:
+            print(f"AUC: {new_value}")
+            print(f"Epoch number {self.count + 1}")
 
         if self.count == 0:
             new_ema = new_value
-            print("Added first value")
+            if verbose == True:
+                print("Added first value")
         else:   
             new_ema = self.auc_track[-1] * self.__lam__ / (1 + self.count) + self.ema_track[-1] * (1 - self.__lam__ / (1 + self.count))
-            print(f"New EMA computed: {new_ema}")
+            if verbose == True:
+               print(f"New EMA computed: {new_ema}")
             threshold = max(self.ema_track) * (1 - self.__thresh__)
-            print(f"New ema is {new_ema}, while threshold is {threshold}")
+            if verbose == True:
+                print(f"New ema is {new_ema}, while threshold is {threshold}")
       
 
         self.count += 1
         self.ema_track.append(new_ema)
 
         if self.count < self.__minimum_iters__:
-            print("Still under minimum iterations threshold")
+            if verbose == True:
+                print("Still under minimum iterations threshold")
             return False
         
         if new_ema < threshold:
@@ -166,5 +168,7 @@ train_loader = DataLoader(train_dataset, batch_size=5, shuffle = True)
 test_loader = DataLoader(test_dataset, batch_size=5, shuffle=False)
 
 trainer = GCN_Train(33, 2, 16)
-trainer.train(train_loader)
+while not trainer.flagraiser:
+    trainer.train(train_loader, verbose = True)
+    trainer.validate(test_loader, verbose = True)
 
