@@ -42,6 +42,7 @@ class GCN_Train():
         self.model = GCN(input_dim = input_dim, output_dim = output_dim, hidden_channels = hidden_channels).double()
         self.metric = metrics
         self.flagraiser = False
+        self.train_acc = [] # Note that validation accuracy is tracked in the flag raiser object
 
         if loss_fxn == 'cel':
             self.criterion = torch.nn.CrossEntropyLoss()
@@ -69,6 +70,20 @@ class GCN_Train():
             if verbose == True:
                 print(f"Batch #{batch} complete")
                 batch += 1
+
+        # Find training accuracy
+        self.model.eval()
+        pred = []
+        true = []
+
+        for data in train_DL:
+            pred.append(self.predict(data.x, data.edge_index, data.batch))
+            true.append(data.y)
+
+        final_pred = torch.cat(pred, dim = 0)
+        final_true = torch.cat(true, dim = 0)
+
+        self.train_acc.append(roc_auc_score(final_true, final_pred))
 
     def validate(self, valid_DL, verbose = False):
         self.model.eval()
@@ -148,27 +163,3 @@ class EarlyStopFlag():
         self.auc_track = []
         self.ema_track = []
         self.count = 0
-
-
-test = EarlyStopFlag(.05, .3, 10)
-for i in range(0, 50):
-    if test.update(np.random.randn()):
-        break
-
-
-torch.manual_seed(12345)
-dataset = datasets.c1Data().shuffle()
-
-train_dataset = dataset[:24]
-test_dataset = dataset[24:]
-
-# Batching
-from torch_geometric.data import DataLoader
-train_loader = DataLoader(train_dataset, batch_size=5, shuffle = True)
-test_loader = DataLoader(test_dataset, batch_size=5, shuffle=False)
-
-trainer = GCN_Train(33, 2, 16)
-while not trainer.flagraiser:
-    trainer.train(train_loader, verbose = True)
-    trainer.validate(test_loader, verbose = True)
-
