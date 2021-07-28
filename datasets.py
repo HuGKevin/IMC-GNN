@@ -1,4 +1,7 @@
-import pandas, numpy, torch
+import pandas as pd
+import numpy as np
+import torch
+import networkx as nx
 from pandas.core.frame import DataFrame
 from os import listdir
 from os.path import isfile, join, splitext
@@ -7,10 +10,9 @@ from torch_geometric.data import Data, Dataset, DataLoader, batch
 from torch_geometric.data.in_memory_dataset import InMemoryDataset
 from torch_geometric.nn.pool import radius
 from torch_geometric.utils import to_networkx, from_networkx, subgraph
-import networkx as nx
 from itertools import product
 
-pandas.options.mode.chained_assignment = None
+pd.options.mode.chained_assignment = None
 
 # So i'm going to keep both the c1 and c2 datasets because they're convenient to be able to load. 
 # Loads data from c1 dataset
@@ -43,11 +45,11 @@ class c1Data(InMemoryDataset):
         for label in labels:
             folderpath = join(folder, label)
             for file in listdir(folderpath):
-                pointer = pandas.read_csv(join(folderpath, file)) # Read in the data
+                pointer = pd.read_csv(join(folderpath, file)) # Read in the data
                 # Construct adjacency matrix
                 file_neigh = pointer.iloc[:, 48:pointer.shape[1]]
                 file_cellid = pointer.iloc[:,1] # Cell ID
-                file1preadjacency = pandas.concat([file_cellid, file_neigh], axis = 1) # Join cell IDs to neighbor data
+                file1preadjacency = pd.concat([file_cellid, file_neigh], axis = 1) # Join cell IDs to neighbor data
                 # Arrange into two-columns - cell ID and neighbor
                 f12 = file1preadjacency.melt(id_vars = "CellId", value_vars = file1preadjacency.columns[1:], var_name = "NeighbourNumber", value_name = "NeighbourId")
                 f13 = f12[f12.NeighbourId != 0].drop('NeighbourNumber', axis = 1) # Remove all non-neighbor lines
@@ -95,11 +97,11 @@ class c2Data(InMemoryDataset):
         for label in labels:
             folderpath = join(folder, label)
             for file in listdir(folderpath):
-                pointer = pandas.read_csv(join(folderpath, file)) # Read in the data
+                pointer = pd.read_csv(join(folderpath, file)) # Read in the data
                 # Construct adjacency matrix
                 file_neigh = pointer.iloc[:, 48:pointer.shape[1]]
                 file_cellid = pointer.iloc[:,1] # Cell ID
-                file1preadjacency = pandas.concat([file_cellid, file_neigh], axis = 1) # Join cell IDs to neighbor data
+                file1preadjacency = pd.concat([file_cellid, file_neigh], axis = 1) # Join cell IDs to neighbor data
                 # Arrange into two-columns - cell ID and neighbor
                 f12 = file1preadjacency.melt(id_vars = "CellId", value_vars = file1preadjacency.columns[1:], var_name = "NeighbourNumber", value_name = "NeighbourId")
                 f13 = f12[f12.NeighbourId != 0].drop('NeighbourNumber', axis = 1) # Remove all non-neighbor lines
@@ -174,7 +176,7 @@ class c1_ck_subgraphs(InMemoryDataset):
             # Extract the edge and node features for each subgraph
             for p in range(0, results.shape[0]):
                 subgraph_edges = subgraph(results.Neighborhood_nodes[p], pt_data.edge_index)[0]
-                unique_nodes = numpy.unique(subgraph_edges[1,:].tolist()).tolist()
+                unique_nodes = np.unique(subgraph_edges[1,:].tolist()).tolist()
                 for i,x in enumerate(unique_nodes):
                     for q in range(0, subgraph_edges.shape[1]):
                         if subgraph_edges[0,q] == x:
@@ -229,7 +231,7 @@ class c1_area_subgraphs(InMemoryDataset):
         for label in labels:
             folderpath = join(folder, label)
             for file in listdir(folderpath):
-                pointer = pandas.read_csv(join(folderpath, file)) # Read in the data
+                pointer = pd.read_csv(join(folderpath, file)) # Read in the data
                 xmin = pointer.X_position.min()
                 ymin = pointer.Y_position.min()
                 x_width = (pointer.X_position.max() - pointer.X_position.min()) / 5
@@ -261,12 +263,12 @@ class c1_area_subgraphs(InMemoryDataset):
 
                     window_neigh = pointer_window.iloc[:, 48:pointer_window.shape[1]]
                     window_cellid = pointer_window.iloc[:,1]
-                    window_preadj = pandas.concat([window_cellid, window_neigh], axis = 1)
+                    window_preadj = pd.concat([window_cellid, window_neigh], axis = 1)
                     w12 = window_preadj.melt(id_vars = "CellId", value_vars = window_preadj.columns[1:], var_name = "NeighbourNumber", value_name = "NeighbourId") # Convert to two-column edges
                     w13 = w12[w12.NeighbourId != 0].drop('NeighbourNumber', axis = 1) # Drop the empty edges
                     w14 = w13[w13.NeighbourId.isin(w13.CellId)] # Drop edges that go to nodes not in the window
                     # Reindex the edges such that they match node dimensions
-                    unique_nodes = numpy.unique(w14.CellId.tolist()) 
+                    unique_nodes = np.unique(w14.CellId.tolist()) 
                     for i,x in enumerate(unique_nodes):
                         for q in range(0, w14.shape[0]): # Need to figure out how to suppress warnings here, or at least understand the warning.
                             if w14.iloc[q,0] == x:
@@ -318,9 +320,9 @@ class c1_naive_neighbors(InMemoryDataset):
         for label in labels:
             folderpath = join(folder, label)
             for file in listdir(folderpath):
-                pointer = pandas.read_csv(join(folderpath, file)) # Read in the data
+                pointer = pd.read_csv(join(folderpath, file)) # Read in the data
                 computer = pointer[["CellId", "X_position", "Y_position"]]
-                computer.loc[0:,"neighbors"] = numpy.nan # Can ignore the value warning.
+                computer.loc[0:,"neighbors"] = np.nan # Can ignore the value warning.
                 computer['neighbors'] = computer['neighbors'].astype(object) # So the column accepts list objects
                 for i in range(0, computer.shape[0]):
                     x_i = computer.iloc[i, 1]
@@ -334,7 +336,7 @@ class c1_naive_neighbors(InMemoryDataset):
                 for index, cell in computer.iterrows():
                     neighborlist.append([[cell.CellId, i] for i in cell.neighbors])
                 neighborlist = [item for sublist in neighborlist for item in sublist]
-                neighborlist = numpy.array([i for i in neighborlist if i[0] != i[1]])
+                neighborlist = np.array([i for i in neighborlist if i[0] != i[1]])
                 
                 relcols = pointer.columns[2:35] # we need columns 2:34
                 vertex_tensor = torch.tensor(pointer.loc[:, relcols].values, dtype = torch.double)
@@ -404,7 +406,7 @@ class c1_naive_ck_subgraphs(InMemoryDataset):
             # Extract the edge and node features for each subgraph
             for p in range(0, results.shape[0]):
                 subgraph_edges = subgraph(results.Neighborhood_nodes[p], pt_data.edge_index)[0]
-                unique_nodes = numpy.unique(subgraph_edges[1,:].tolist()).tolist()
+                unique_nodes = np.unique(subgraph_edges[1,:].tolist()).tolist()
                 for i,x in enumerate(unique_nodes):
                     for q in range(0, subgraph_edges.shape[1]):
                         if subgraph_edges[0,q] == x:
@@ -493,9 +495,9 @@ class IMC_Data(InMemoryDataset):
     
         if self.neighbordef == 'naive':
             for data in dataset:
-                computer = DataFrame(data.pos.numpy(), columns=['X_position', 'Y_position']) # Read in the data
+                computer = DataFrame(data.pos.np(), columns=['X_position', 'Y_position']) # Read in the data
                 computer.insert(0, 'CellId', [i for i in range(1, data.pos.shape[0] + 1)])
-                computer.loc[0:,"neighbors"] = numpy.nan # Can ignore the value warning.
+                computer.loc[0:,"neighbors"] = np.nan # Can ignore the value warning.
                 computer['neighbors'] = computer['neighbors'].astype(object) # So the column accepts list objects
                 for i in range(0, computer.shape[0]):
                     x_i = computer.iloc[i, 1]
@@ -509,10 +511,21 @@ class IMC_Data(InMemoryDataset):
                 for index, cell in computer.iterrows():
                     neighborlist.append([[cell.CellId, i] for i in cell.neighbors])
                 neighborlist = [item for sublist in neighborlist for item in sublist]
-                neighborlist = numpy.array([i for i in neighborlist if i[0] != i[1]])
+                neighborlist = np.array([i for i in neighborlist if i[0] != i[1]])
                 edge_tensor = torch.tensor(neighborlist.transpose() - 1, dtype = torch.long) #names = ("CellId", "NeighbourId")) 
         elif self.neighbordef == 'knn':
-            
+            for data in dataset:            
+                computer = DataFrame(data.pos.np(), columns=['X_position', 'Y_position']) # Read in the data
+                computer.insert(0, 'CellId', [i for i in range(1, data.pos.shape[0] + 1)])
+                
+                for index, row in computer.iterrows():
+                    distance = np.sqrt((computer.X_position - row.X_position) ** 2 + (computer.Y_position - row.Y_position) ** 2)
+                    sorts = sorted(enumerate(distance), key = lambda x:x[1])
+                    targets = [sorts [i][0] for i in range(1, n + 1)]
+                    edges = edges + [[index, i] for i in targets] + [[i, index] for i in targets]
+                # Find unique edges
+                unique_edges = [list(x) for x in set(tuple(x) for x in edges)]
+                edge_tensor = torch.tensor(np.array(unique_edges).transpose(), dtype = torch.long)
         
         if self.subgraph == 'high_exp':
 
@@ -529,11 +542,11 @@ class IMC_Data(InMemoryDataset):
         for label in labels:
             folderpath = join(folder, label)
             for file in listdir(folderpath):
-                pointer = pandas.read_csv(join(folderpath, file)) # Read in the data
+                pointer = pd.read_csv(join(folderpath, file)) # Read in the data
                 # Construct adjacency matrix
                 file_neigh = pointer.iloc[:, 48:pointer.shape[1]]
                 file_cellid = pointer.iloc[:,1] # Cell ID
-                file1preadjacency = pandas.concat([file_cellid, file_neigh], axis = 1) # Join cell IDs to neighbor data
+                file1preadjacency = pd.concat([file_cellid, file_neigh], axis = 1) # Join cell IDs to neighbor data
                 # Arrange into two-columns - cell ID and neighbor
                 f12 = file1preadjacency.melt(id_vars = "CellId", value_vars = file1preadjacency.columns[1:], var_name = "NeighbourNumber", value_name = "NeighbourId")
                 f13 = f12[f12.NeighbourId != 0].drop('NeighbourNumber', axis = 1) # Remove all non-neighbor lines
