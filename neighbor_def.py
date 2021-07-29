@@ -95,6 +95,48 @@ for i in range(0, computer.shape[0]):
     computer.loc[:, 'ic'] = computer.loc[i, 'C'] * (x_i * computer.slope - y_i) ** 2
 
 
+# Define neighbors by the n nearest cells within a distance
+from itertools import product
+n = 5
+max_distance = 40
+
+folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c1/"
+labels = ['DCB', 'NDB']
+dataset = []
+
+for label in labels:
+    folderpath = join(folder, label)
+    for file in listdir(folderpath):
+        pointer = pandas.read_csv(join(folderpath, file)) # Read in the data
+
+        computer = pointer[['CellId', 'X_position', 'Y_position']]
+
+        edges = []
+        for index, row in computer.iterrows():
+            distance = np.sqrt((computer.X_position - row.X_position) ** 2 + (computer.Y_position - row.Y_position) ** 2)
+            sorts = sorted(enumerate(distance))
+            targets = [sorts [-i][0] for i in range(2, n + 2)]
+            edges = edges + [[index, i] for i in targets] + [[i, index] for i in targets]
+            # Find unique edges
+        
+        unique_edges = [list(x) for x in set(tuple(x) for x in edges)]
+
+
+
+        # Construct adjacency matrix
+        file_neigh = pointer.iloc[:, 48:pointer.shape[1]]
+        file_cellid = pointer.iloc[:,1] # Cell ID
+        file1preadjacency = pandas.concat([file_cellid, file_neigh], axis = 1) # Join cell IDs to neighbor data
+        # Arrange into two-columns - cell ID and neighbor
+        f12 = file1preadjacency.melt(id_vars = "CellId", value_vars = file1preadjacency.columns[1:], var_name = "NeighbourNumber", value_name = "NeighbourId")
+        f13 = f12[f12.NeighbourId != 0].drop('NeighbourNumber', axis = 1) # Remove all non-neighbor lines
+        
+        relcols = pointer.columns[2:35] # we need columns 2:34
+        vertex_tensor = torch.tensor(pointer.loc[:, relcols].values, dtype = torch.double)
+        edge_tensor = torch.tensor(f13.transpose().values) #names = ("CellId", "NeighbourId"))
+        dataset.append(Data(x = vertex_tensor, edge_index = edge_tensor, y = torch.tensor([int(label == "DCB")])))
+
+
 
 
 # Distribution of major and minor axis lengths of cells

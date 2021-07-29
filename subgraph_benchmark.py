@@ -11,7 +11,7 @@ from random import randint
 
 # Training function
 def train():
-    model.train()
+    model.train() # Switch to training mode
 
     for data in train_loader:
         out = model(data.x, data.edge_index, data.batch)
@@ -22,7 +22,7 @@ def train():
 
 # Test function
 def test(loader):
-    model.eval()
+    model.eval() # Switch to evaluation mode
 
     correct = 0
     for data in loader:
@@ -38,7 +38,7 @@ dataset = datasets.c1Data()
 class GCN(torch.nn.Module):
     def __init__(self, hidden_channels):
         super(GCN, self).__init__()
-        self.conv1 = GCNConv(dataset.num_node_features, hidden_channels)
+        self.conv1 = GCNConv(dataset.num_node_features, hidden_channels) ### Things like dataset features can be passed through as arguments. Will probably simplify things. 
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.conv3 = GCNConv(hidden_channels, hidden_channels)
         self.lin = Linear(hidden_channels, dataset.num_classes)
