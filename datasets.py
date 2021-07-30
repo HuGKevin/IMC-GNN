@@ -119,6 +119,108 @@ class c2Data(InMemoryDataset):
         data, slices = self.collate(dataset)
         torch.save((data, slices), self.processed_paths[0])
 
+class neighbor_metric_class(InMemoryDataset):
+    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", 
+                    transform = None, pre_transform = None, pre_filter = None,
+                    dataset = 'c2', neighbordef = 'initial',
+                    naive_radius = 25,
+                    knn = 5, knn_max = 50):
+        self.dataset = dataset
+        
+        self.neighbordef = neighbordef
+        if self.neighbordef == 'naive':
+            self.naive_radius = naive_radius
+        elif self.neighbordef == 'knn':
+            self.knn = knn
+            self.max_distance = knn_max
+        elif self.neighbordef == 'ellipse':
+            print("Coming soon to a theater near you.")
+        else:
+            raise print("Choose a valid neighbor metric.")
+
+        super(neighbor_metric_class, self).__init__(root, transform, pre_transform, pre_filter)
+        self.data, self.slices = torch.load(self.processed_paths[0])                                
+
+    @property
+    def raw_file_names(self):
+        folder = f"C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/{self.dataset}/"
+        labels = ['DCB', 'NDB']
+        names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
+        return names
+
+    @property
+    def processed_file_names(self):
+        if self.neighbordef == 'naive':
+            neighbor_metric = f'naive{self.naive_radius}'
+        if self.neighbordef == 'knn':
+            neighbor_metric = f'knn{self.knn}max{self.max_distance}'
+
+        return [f'{self.dataset}_{neighbor_metric}.data']
+
+    def download(self):
+        # Leave this empty?
+        return []
+
+    def process(self):
+        if self.dataset == 'c1':
+            dataset = c1Data()
+        elif self.dataset == 'c2':
+            dataset = c2Data()
+
+        new_neighbors = []
+        if self.neighbordef == 'naive':
+            for data in dataset:
+                computer = DataFrame(data.pos.numpy(), columns=['X_position', 'Y_position']) # Read in the data
+                computer.insert(0, 'CellId', [i for i in range(1, data.pos.shape[0] + 1)])
+                computer.loc[0:,"neighbors"] = np.nan # Can ignore the value warning.
+                computer['neighbors'] = computer['neighbors'].astype(object) # So the column accepts list objects
+                for i in range(0, computer.shape[0]):
+                    x_i = computer.iloc[i, 1]
+                    y_i = computer.iloc[i, 2]
+                    nbd = (computer.X_position - x_i) ** 2 + (computer.Y_position - y_i) ** 2 < self.naive_radius ** 2 # All the neighbors within radius of indexed cell
+                    nbd = list(computer.loc[[i for i, x in enumerate(nbd) if x], ["CellId"]].CellId) # Find indices of those neighbors
+                    computer.at[i, 'neighbors'] = nbd
+                    
+                # Now I have to convert it to a list of pairs. 
+                neighborlist = []
+                for index, cell in computer.iterrows():
+                    neighborlist.append([[cell.CellId, i] for i in cell.neighbors])
+                neighborlist = [item for sublist in neighborlist for item in sublist]
+                neighborlist = np.array([i for i in neighborlist if i[0] != i[1]])
+                edge_tensor = torch.tensor(neighborlist.transpose() - 1, dtype = torch.long) #names = ("CellId", "NeighbourId")) 
+
+                new_neighbors.append(Data(x = data.x,
+                                      y = data.y,
+                                      edge_index = edge_tensor,
+                                      pos = data.pos,
+                                      name = data.name + '_naive' + str(self.naive_radius)))
+
+        elif self.neighbordef == 'knn':
+            for data in dataset:            
+                computer = DataFrame(data.pos.np(), columns=['X_position', 'Y_position']) # Read in the data
+                computer.insert(0, 'CellId', [i for i in range(1, data.pos.shape[0] + 1)])
+                
+                for index, row in computer.iterrows():
+                    distance = np.sqrt((computer.X_position - row.X_position) ** 2 + (computer.Y_position - row.Y_position) ** 2)
+                    sorts = sorted(enumerate(distance), key = lambda x:x[1])
+                    targets = [sorts [i][0] for i in range(1, n + 1)]
+                    edges = edges + [[index, i] for i in targets] + [[i, index] for i in targets]
+                # Find unique edges
+                unique_edges = [list(x) for x in set(tuple(x) for x in edges)]
+                edge_tensor = torch.tensor(np.array(unique_edges).transpose(), dtype = torch.long)
+
+                new_neighbors.append(Data(x = data.x,
+                                    y = data.y,
+                                    edge_index = edge_tensor,
+                                    pos = data.pos,
+                                    name = data.name + '_naive' + str(25)))
+                                    
+        
+        data, slices = self.collate(new_neighbors)
+        torch.save((data, slices), self.processed_paths[0])
+
+
+
 # Function that finds all neighbors a distance 'n' from node 'node' on graph 'G' 
 def neighborhood(G, node, n):
     path_lengths = nx.single_source_dijkstra_path_length(G, node)
@@ -186,45 +288,19 @@ class IMC_Data(InMemoryDataset):
         # Leave this empty?
         return []
 
-    def process(self):
-        if self.dataset == 'c1':
-            dataset = c1Data()
-        elif self.dataset == 'c2':
-            dataset = c2Data()
-    
-        if self.neighbordef == 'naive':
-            for data in dataset:
-                computer = DataFrame(data.pos.numpy(), columns=['X_position', 'Y_position']) # Read in the data
-                computer.insert(0, 'CellId', [i for i in range(1, data.pos.shape[0] + 1)])
-                computer.loc[0:,"neighbors"] = np.nan # Can ignore the value warning.
-                computer['neighbors'] = computer['neighbors'].astype(object) # So the column accepts list objects
-                for i in range(0, computer.shape[0]):
-                    x_i = computer.iloc[i, 1]
-                    y_i = computer.iloc[i, 2]
-                    nbd = (computer.X_position - x_i) ** 2 + (computer.Y_position - y_i) ** 2 < self.naive_radius ** 2 # All the neighbors within radius of indexed cell
-                    nbd = list(computer.loc[[i for i, x in enumerate(nbd) if x], ["CellId"]].CellId) # Find indices of those neighbors
-                    computer.at[i, 'neighbors'] = nbd
-                    
-                # Now I have to convert it to a list of pairs. 
-                neighborlist = []
-                for index, cell in computer.iterrows():
-                    neighborlist.append([[cell.CellId, i] for i in cell.neighbors])
-                neighborlist = [item for sublist in neighborlist for item in sublist]
-                neighborlist = np.array([i for i in neighborlist if i[0] != i[1]])
-                edge_tensor = torch.tensor(neighborlist.transpose() - 1, dtype = torch.long) #names = ("CellId", "NeighbourId")) 
+    def process(self):    
+        if self.neighbordef == 'initial':
+            if self.dataset == 'c1':
+                dataset = c1Data()
+            elif self.dataset == 'c2':
+                dataset = c2Data()
+        elif self.neighbordef == 'naive':
+            dataset = neighbor_metric_class(dataset = self.dataset, neighbordef = self.neighbordef,
+                                  naive_radius = self.naive_radius)
         elif self.neighbordef == 'knn':
-            for data in dataset:            
-                computer = DataFrame(data.pos.np(), columns=['X_position', 'Y_position']) # Read in the data
-                computer.insert(0, 'CellId', [i for i in range(1, data.pos.shape[0] + 1)])
-                
-                for index, row in computer.iterrows():
-                    distance = np.sqrt((computer.X_position - row.X_position) ** 2 + (computer.Y_position - row.Y_position) ** 2)
-                    sorts = sorted(enumerate(distance), key = lambda x:x[1])
-                    targets = [sorts [i][0] for i in range(1, n + 1)]
-                    edges = edges + [[index, i] for i in targets] + [[i, index] for i in targets]
-                # Find unique edges
-                unique_edges = [list(x) for x in set(tuple(x) for x in edges)]
-                edge_tensor = torch.tensor(np.array(unique_edges).transpose(), dtype = torch.long)
+            dataset = neighbor_metric_class(dataset = self.dataset, neighbordef = self.neighbordef,
+                                  knn = self.knn, knn_max = self.max_distance)
+            
         
         if self.subgraph == 'high_exp':
             subgraph_dataset = []
@@ -275,7 +351,12 @@ class IMC_Data(InMemoryDataset):
                                data.pos[:,1].min(), data.pos[:,1].max() - self.window_width] 
                                # x_min, x_max (adj for window width), y_min, y_max (adj for window width)
                 counter = 1
+                window_counter = 1
                 while counter < self.window_number + 1:
+                    if window_counter > 1000:
+                        print(f'Exceeded 1000 attempts on graph {data_counter}, skipping.')
+                        break
+                    window_counter += 1
                     window_x = np.random.random() * (sample_dims[1] - sample_dims[0]) + sample_dims[0]
                     window_y = np.random.random() * (sample_dims[3] - sample_dims[2])+ sample_dims[2]
                     window_dims = [window_x, window_x + self.window_width,
@@ -307,7 +388,7 @@ class IMC_Data(InMemoryDataset):
                                                  name = data.name + '_window' + str(counter)))
                     counter += 1
                 
-                print(f'Windows for graph {data_counter} of {len(dataset)} completed.')
+                print(f'Windows for graph {data_counter} of {len(dataset)} completed after {window_counter} windows attempted.')
                 data_counter += 1
      
         data, slices = self.collate(subgraph_dataset)
