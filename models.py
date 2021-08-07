@@ -110,6 +110,25 @@ class GCN_Train():
         pred = out.argmax(dim = 1)
         return pred
 
+    # Same as valid() but doesn't update any metric trackers.
+    def test(self, valid_DL, verbose = False):
+        self.model.eval()
+
+        pred = []
+        true = []
+
+        for data in valid_DL:
+            pred.append(self.predict(data.x, data.edge_index, data.batch))
+            true.append(data.y)
+
+        final_pred = torch.cat(pred, dim = 0)
+        final_true = torch.cat(true, dim = 0)
+
+        if self.metric == 'auc':
+            score = roc_auc_score(final_true, final_pred)
+
+        return score
+
 
 class EarlyStopFlag():
     def __init__(self, threshold, lam, minimum_iters, max_mode = False, name = None):
@@ -138,7 +157,7 @@ class EarlyStopFlag():
             if verbose == True:
                 print("Added first value")
         else:   
-            new_ema = self.auc_track[-1] * self.__lam__ / (1 + self.count) + self.ema_track[-1] * (1 - self.__lam__ / (1 + self.count))
+            new_ema = self.auc_track[-1] * self.__lam__ + self.ema_track[-1] * (1 - self.__lam__)
             if verbose == True:
                print(f"New EMA computed: {new_ema}")
             threshold = max(self.ema_track) * (1 - self.__thresh__)
