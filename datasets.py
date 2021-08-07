@@ -17,13 +17,13 @@ pd.options.mode.chained_assignment = None
 # So i'm going to keep both the c1 and c2 datasets because they're convenient to be able to load. 
 # Loads data from c1 dataset
 class c1Data(InMemoryDataset):
-    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
+    def __init__(self, root = "/data/kevin/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
         super(c1Data, self).__init__(root, transform, pre_transform, pre_filter)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
     def raw_file_names(self):
-        folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c1/"
+        folder = "/data/kevin/IMC_Oct2020/c1/"
         labels = ['DCB', 'NDB']
         names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
         return names
@@ -37,7 +37,7 @@ class c1Data(InMemoryDataset):
         return []
 
     def process(self):
-        folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c1/"
+        folder = "/data/kevin/IMC_Oct2020/c1/"
         labels = ['DCB', 'NDB']
         dataset = []
 
@@ -75,7 +75,7 @@ class c2Data(InMemoryDataset):
 
     @property
     def raw_file_names(self):
-        folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c2/"
+        folder = "/data/kevin/IMC_Oct2020/c2/"
         labels = ['DCB', 'NDB']
         names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
         return names
@@ -89,7 +89,7 @@ class c2Data(InMemoryDataset):
         return []
 
     def process(self):
-        folder = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/c2/"
+        folder = "/data/kevin/IMC_Oct2020/c2/"
         labels = ['DCB', 'NDB']
         dataset = []
 
@@ -120,7 +120,7 @@ class c2Data(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0])
 
 class neighbor_metric_class(InMemoryDataset):
-    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", 
+    def __init__(self, root = "/data/kevin/IMC_Oct2020/", 
                     transform = None, pre_transform = None, pre_filter = None,
                     dataset = 'c2', neighbordef = 'initial',
                     naive_radius = 25,
@@ -143,7 +143,7 @@ class neighbor_metric_class(InMemoryDataset):
 
     @property
     def raw_file_names(self):
-        folder = f"C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/{self.dataset}/"
+        folder = f"/data/kevin/IMC_Oct2020/{self.dataset}/"
         labels = ['DCB', 'NDB']
         names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
         return names
@@ -203,7 +203,7 @@ class neighbor_metric_class(InMemoryDataset):
                 for index, row in computer.iterrows():
                     distance = np.sqrt((computer.X_position - row.X_position) ** 2 + (computer.Y_position - row.Y_position) ** 2)
                     sorts = sorted(enumerate(distance), key = lambda x:x[1])
-                    targets = [sorts [i][0] for i in range(1, n + 1)]
+                    targets = [sorts [i][0] for i in range(1, self.knn + 1)]
                     edges = edges + [[index, i] for i in targets] + [[i, index] for i in targets]
                 # Find unique edges
                 unique_edges = [list(x) for x in set(tuple(x) for x in edges)]
@@ -228,7 +228,7 @@ def neighborhood(G, node, n):
                     if length == n]
 
 class IMC_Data(InMemoryDataset):
-    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", 
+    def __init__(self, root = "/data/kevin/IMC_Oct2020/", 
                  transform = None, pre_transform = None, pre_filter = None,
                  dataset = 'c2', neighbordef = 'initial', subgraph = 'windows',
                  naive_radius = 25,
@@ -265,7 +265,7 @@ class IMC_Data(InMemoryDataset):
 
     @property
     def raw_file_names(self):
-        folder = f"C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/{self.dataset}/"
+        folder = f"/data/kevin/IMC_Oct2020/{self.dataset}/"
         labels = ['DCB', 'NDB']
         names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
         return names
@@ -375,12 +375,10 @@ class IMC_Data(InMemoryDataset):
                     ndata = to_networkx(data)
                     nsub = ndata.subgraph(node_indices)
                     edges = np.array([[i,x] for i,x in nsub.edges]).transpose()
-                    for i,x in enumerate(node_indices):
-                        for q in range(0, edges.shape[1]):
-                            if edges[0,q] == x:
-                                edges[0,q] = i
-                            if edges[1,q] == x:
-                                edges[1,q] = i
+                    d = dict((x,i) for i,x in enumerate(node_indices))
+                    for q in range(0, edges.shape[1]):
+                        edges[0,q] = d[edges[0,q]]
+                        edges[1,q] = d[edges[1,q]]
                     subgraph_dataset.append(Data(x = nodes,
                                                  y = data.y,
                                                  edge_index = torch.tensor(edges, dtype = torch.long),
