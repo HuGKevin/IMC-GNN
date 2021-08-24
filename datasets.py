@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import torch
 import networkx as nx
+import re
 from pandas.core.frame import DataFrame
 from os import listdir
 from os.path import isfile, join, splitext
@@ -17,13 +18,13 @@ pd.options.mode.chained_assignment = None
 # So i'm going to keep both the c1 and c2 datasets because they're convenient to be able to load. 
 # Loads data from c1 dataset
 class c1Data(InMemoryDataset):
-    def __init__(self, root = "/data/kevin/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
+    def __init__(self, root = "/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
         super(c1Data, self).__init__(root, transform, pre_transform, pre_filter)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
     def raw_file_names(self):
-        folder = "/data/kevin/IMC_Oct2020/c1/"
+        folder = "/data/IMC_Oct2020/c1/"
         labels = ['DCB', 'NDB']
         names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
         return names
@@ -37,7 +38,7 @@ class c1Data(InMemoryDataset):
         return []
 
     def process(self):
-        folder = "/data/kevin/IMC_Oct2020/c1/"
+        folder = "/data/IMC_Oct2020/c1/"
         labels = ['DCB', 'NDB']
         dataset = []
 
@@ -69,13 +70,13 @@ class c1Data(InMemoryDataset):
 
 # Loads data from c2 dataset
 class c2Data(InMemoryDataset):
-    def __init__(self, root = "C:/Users/Kevin Hu/Desktop/Kluger/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
+    def __init__(self, root = "/data/IMC_Oct2020/", transform = None, pre_transform = None, pre_filter = None):
         super(c2Data, self).__init__(root, transform, pre_transform, pre_filter)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
     def raw_file_names(self):
-        folder = "/data/kevin/IMC_Oct2020/c2/"
+        folder = "/data/IMC_Oct2020/c2/"
         labels = ['DCB', 'NDB']
         names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
         return names
@@ -89,7 +90,7 @@ class c2Data(InMemoryDataset):
         return []
 
     def process(self):
-        folder = "/data/kevin/IMC_Oct2020/c2/"
+        folder = "/data/IMC_Oct2020/c2/"
         labels = ['DCB', 'NDB']
         dataset = []
 
@@ -120,7 +121,7 @@ class c2Data(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0])
 
 class neighbor_metric_class(InMemoryDataset):
-    def __init__(self, root = "/data/kevin/IMC_Oct2020/", 
+    def __init__(self, root = "/data/IMC_Oct2020/", 
                     transform = None, pre_transform = None, pre_filter = None,
                     dataset = 'c2', neighbordef = 'initial',
                     naive_radius = 25,
@@ -143,7 +144,7 @@ class neighbor_metric_class(InMemoryDataset):
 
     @property
     def raw_file_names(self):
-        folder = f"/data/kevin/IMC_Oct2020/{self.dataset}/"
+        folder = f"/data/IMC_Oct2020/{self.dataset}/"
         labels = ['DCB', 'NDB']
         names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
         return names
@@ -228,7 +229,7 @@ def neighborhood(G, node, n):
                     if length == n]
 
 class IMC_Data(InMemoryDataset):
-    def __init__(self, root = "/data/kevin/IMC_Oct2020/", 
+    def __init__(self, root = "/data/IMC_Oct2020/", 
                  transform = None, pre_transform = None, pre_filter = None,
                  dataset = 'c2', neighbordef = 'initial', subgraph = 'windows',
                  naive_radius = 25,
@@ -265,7 +266,7 @@ class IMC_Data(InMemoryDataset):
 
     @property
     def raw_file_names(self):
-        folder = f"/data/kevin/IMC_Oct2020/{self.dataset}/"
+        folder = f"/data/IMC_Oct2020/{self.dataset}/"
         labels = ['DCB', 'NDB']
         names = listdir(join(folder, labels[0])) + listdir(join(folder, labels[1]))
         return names
@@ -390,4 +391,59 @@ class IMC_Data(InMemoryDataset):
                 data_counter += 1
      
         data, slices = self.collate(subgraph_dataset)
+        torch.save((data, slices), self.processed_paths[0])
+
+class HIV_Data(InMemoryDataset):
+    def __init__(self, root = "/data/HIV/", transform = None, pre_transform = None, pre_filter = None):
+        super(HIV_Data, self).__init__(root, transform, pre_transform, pre_filter)
+        self.data, self.slices = torch.load(self.processed_paths[0])
+
+
+    @property
+    def raw_file_names(self):
+        folder = "/data/HIV/segmented/"
+        names = listdir(folder)
+        return names
+
+    @property
+    def processed_file_names(self):
+        return ['HIV.data']
+
+    def download(self):
+        # Leave this empty?
+        return []
+
+    def process(self):
+        folder = "/data/HIV/segmented/"
+        key_table = pd.read_csv('/data/HIV/HIV_key.csv') # Note that T32 is negative, not positive, based on dropbox data, not on annotation key, and T45 is the same.
+        dataset = []
+
+        # Data are split into responders (DCB) and nonresponders (NDB)
+        for file in listdir(folder):
+            print(f'pre-reading csv {file}')
+            pointer = pd.read_csv(join(folder, file)) # Read in the data
+            print('post-reading csv')
+            label = re.search('T[0-9]*', file)[0]
+            status = key_table.loc[key_table.Label == label, 'HIV']
+            # Construct adjacency matrix
+###### START HERE ########
+            file_neigh = pointer.iloc[:, 128:pointer.shape[1]]
+            file_cellid = pointer.iloc[:,1] # Cell ID
+            file1preadjacency = pd.concat([file_cellid, file_neigh], axis = 1) # Join cell IDs to neighbor data
+            # Arrange into two-columns - cell ID and neighbor
+            f12 = file1preadjacency.melt(id_vars = "CellId", value_vars = file1preadjacency.columns[1:], var_name = "NeighbourNumber", value_name = "NeighbourId")
+            f13 = f12[f12.NeighbourId != 0].drop('NeighbourNumber', axis = 1) # Remove all non-neighbor lines
+
+            # Get values at each cell
+            relcols = pointer.columns[2:35] # we need columns 2:34
+            vertex_tensor = torch.tensor(pointer.loc[:, relcols].values, dtype = torch.double)
+            edge_tensor = torch.tensor(f13.transpose().values - 1) #names = ("CellId", "NeighbourId")) 
+            pos_tensor = torch.tensor(pointer.loc[:, ['X_position', 'Y_position']].values, dtype = torch.double)
+            dataset.append(Data(x = vertex_tensor, 
+                                edge_index = edge_tensor, 
+                                y = torch.tensor(status.values), 
+                                pos = pos_tensor,
+                                name = splitext(file)[0]))
+
+        data, slices = self.collate(dataset)
         torch.save((data, slices), self.processed_paths[0])
