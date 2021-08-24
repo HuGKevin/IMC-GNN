@@ -1,6 +1,9 @@
+import sys
+sys.path.append('/home/kevin/project')
+
 from itertools import count
 import torch
-import datasets
+from IMC_GNN import datasets
 from torch_geometric.nn import GCNConv, global_mean_pool
 from torch.nn import Linear
 from sklearn.metrics import roc_auc_score
@@ -174,7 +177,7 @@ class EarlyStopFlag():
                 print("Still under minimum iterations threshold")
             return False
 
-        if stall_test(self.auc_track, self.__stall_lim__):
+        if self.stall_test(self.auc_track, self.__stall_lim__):
             print(f"AUC has not changed over past {self.__stall_lim__} iterations, early stopping triggered.")
             return True
         
@@ -183,7 +186,7 @@ class EarlyStopFlag():
         else:
             return False
 
-    def stall_test(auc_list, stall_lim):
+    def stall_test(self, auc_list, stall_lim):
         return(len(set(auc_list[-stall_lim:]))) == 1
 
     def reset(self):
