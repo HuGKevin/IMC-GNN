@@ -563,7 +563,9 @@ class NSCLC_Dataset(InMemoryDataset):
                                                  y = data.y,
                                                  edge_index = torch.tensor(edges, dtype = torch.long),
                                                  pos = pos,
-                                                 name = data.name + '_window' + str(counter)))
+                                                 edge_attr = edge_attr,
+                                                 name = data.name,
+                                                 win_num = str(counter)))
                     counter += 1
                 
                 print(f'Windows for graph {data_counter} of {len(dataset)} completed after {window_counter} windows attempted.')
