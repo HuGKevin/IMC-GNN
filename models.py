@@ -40,9 +40,18 @@ class GCN(torch.nn.Module):
 class GCN_Train():
     def __init__(self, 
                  input_dim, output_dim, hidden_channels, 
-                 metrics = 'auc', lr = 0.001, loss_fxn = 'cel', optimizer = 'adam',
+                 metrics = 'auc', lr = 0.001, loss_fxn = 'cel', optimizer = 'adam', cuda = False,
                  es_thresh = 0.03, es_lambda = 0.8, es_min_iter = 100, es_stall_limit = 5):
         self.model = GCN(input_dim = input_dim, output_dim = output_dim, hidden_channels = hidden_channels).double()
+        self.cuda = cuda
+        if self.cuda == True:
+           if torch.cuda.is_available():
+               self.device = torch.device('cuda')
+               self.model = self.model.to(self.device)
+               print('GNN loaded on GPU.')
+           else:
+               print('GPU not available, GNN will remain on CPU')
+               
         self.metric = metrics
         self.flagraiser = False
         self.train_acc = [] # Note that validation accuracy is tracked in the flag raiser object
@@ -65,6 +74,8 @@ class GCN_Train():
 
         batch = 1
         for data in train_DL:
+            if self.cuda:
+                data = data.to(self.device)
             self.out = self.model(data.x, data.edge_index, data.batch) # torch.nn.Module is callable, and is defined to invoke forward(). 
             loss = self.criterion(self.out, data.y)
             loss.backward()
@@ -80,13 +91,16 @@ class GCN_Train():
         true = []
 
         for data in train_DL:
+            if self.cuda:
+                data = data.to(self.device)
             pred.append(self.predict(data.x, data.edge_index, data.batch))
             true.append(data.y)
 
         final_pred = torch.cat(pred, dim = 0)
         final_true = torch.cat(true, dim = 0)
 
-        self.train_acc.append(roc_auc_score(final_true, final_pred))
+        self.train_acc.append(roc_auc_score(final_true.to(torch.device('cpu')),
+                                            final_pred.to(torch.device('cpu'))))
 
     def validate(self, valid_DL, verbose = False):
         self.model.eval()
@@ -95,6 +109,8 @@ class GCN_Train():
         true = []
 
         for data in valid_DL:
+            if self.cuda:
+                data = data.to(self.device)
             pred.append(self.predict(data.x, data.edge_index, data.batch))
             true.append(data.y)
 
@@ -102,7 +118,8 @@ class GCN_Train():
         final_true = torch.cat(true, dim = 0)
 
         if self.metric == 'auc':
-            score = roc_auc_score(final_true, final_pred)
+            score = roc_auc_score(final_true.to(torch.device('cpu')),
+                                  final_pred.to(torch.device('cpu')))
             self.flagraiser = self.flag.update(score, verbose = verbose)
 
         return score
@@ -121,6 +138,8 @@ class GCN_Train():
         true = []
 
         for data in valid_DL:
+            if self.cuda:
+                data = data.to(self.device)
             pred.append(self.predict(data.x, data.edge_index, data.batch))
             true.append(data.y)
 
