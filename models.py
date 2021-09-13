@@ -147,7 +147,8 @@ class GCN_Train():
         final_true = torch.cat(true, dim = 0)
 
         if self.metric == 'auc':
-            score = roc_auc_score(final_true, final_pred)
+            score = roc_auc_score(final_true.to(torch.device('cpu')),
+                                  final_pred.to(torch.device('cpu')))
 
         return score
 
