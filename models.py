@@ -40,29 +40,26 @@ class GCN(torch.nn.Module):
 class GCN_Train():
     def __init__(self, 
                  input_dim, output_dim, hidden_channels, 
-                 metrics = 'auc', lr = 0.001, loss_fxn = 'cel', optimizer = 'adam', cuda = False,
+                 metrics = 'auc', lr = 0.001, loss_fxn = 'cel', optimizer = 'adam',
                  es_thresh = 0.03, es_lambda = 0.8, es_min_iter = 100, es_stall_limit = 5):
         self.model = GCN(input_dim = input_dim, output_dim = output_dim, hidden_channels = hidden_channels).double()
-        self.cuda = cuda
-        if self.cuda == True:
-           if torch.cuda.is_available():
-               self.device = torch.device('cuda')
-               self.model = self.model.to(self.device)
-               print('GNN loaded on GPU.')
-           else:
-               print('GPU not available, GNN will remain on CPU')
-               
+        self.device = torch.device('cpu')
+                       
         self.metric = metrics
         self.flagraiser = False
         self.train_acc = [] # Note that validation accuracy is tracked in the flag raiser object
 
         if loss_fxn == 'cel':
             self.criterion = torch.nn.CrossEntropyLoss()
-        
         if optimizer == 'adam':
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr = lr)
 
         self.flag = EarlyStopFlag(es_thresh, es_lambda, es_min_iter, es_stall_limit)
+
+    def to(self, dev):
+        self.device = torch.device(dev)
+        self.model = self.model.to(self.device)
+        print(f"Model moved to {dev}")
 
     # Trains model for one epoch
     def train(self, train_DL, verbose = False, ignore_es = False):
@@ -74,7 +71,7 @@ class GCN_Train():
 
         batch = 1
         for data in train_DL:
-            if self.cuda:
+            if self.device != torch.device('cpu'):
                 data = data.to(self.device)
             self.out = self.model(data.x, data.edge_index, data.batch) # torch.nn.Module is callable, and is defined to invoke forward(). 
             loss = self.criterion(self.out, data.y)
@@ -91,7 +88,7 @@ class GCN_Train():
         true = []
 
         for data in train_DL:
-            if self.cuda:
+            if self.device != torch.device('cpu'):
                 data = data.to(self.device)
             pred.append(self.predict(data.x, data.edge_index, data.batch))
             true.append(data.y)
@@ -109,7 +106,7 @@ class GCN_Train():
         true = []
 
         for data in valid_DL:
-            if self.cuda:
+            if self.device != torch.device('cpu'):
                 data = data.to(self.device)
             pred.append(self.predict(data.x, data.edge_index, data.batch))
             true.append(data.y)
@@ -138,7 +135,7 @@ class GCN_Train():
         true = []
 
         for data in valid_DL:
-            if self.cuda:
+            if self.device != torch.device('cpu'):
                 data = data.to(self.device)
             pred.append(self.predict(data.x, data.edge_index, data.batch))
             true.append(data.y)
