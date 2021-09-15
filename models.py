@@ -149,6 +149,13 @@ class GCN_Train():
 
         return score
 
+    def load_model(self, path_to_model):
+        self.model.load_state_dict(torch.load(path_to_model))
+        self.model.eval()
+        
+    def save_model(self, path_to_model):
+        torch.save(self.model.state_dict(), path_to_model)
+
 
 class EarlyStopFlag():
     def __init__(self, threshold, lam, minimum_iters, stall_lim, max_mode = False, name = None):
