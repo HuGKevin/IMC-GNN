@@ -4,7 +4,7 @@ sys.path.append('/home/kevin/project')
 from itertools import count
 import torch
 from IMC_GNN import datasets
-from torch_geometric.nn import GCNConv, global_mean_pool
+from torch_geometric.nn import GCNConv, global_mean_pool, SAGPooling
 from torch.nn import Linear
 from sklearn.metrics import roc_auc_score
 import torch.nn.functional as F
@@ -13,12 +13,75 @@ import numpy as np
 # Class for GCN model
 class GCN(torch.nn.Module):
     def __init__(self, input_dim, output_dim, hidden_channels):
-        super(GCN, self).__init__()
+        super().__init__()
         self.conv1 = GCNConv(input_dim, hidden_channels) ### Things like dataset features can be passed through as arguments. Will probably simplify things. 
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.conv3 = GCNConv(hidden_channels, hidden_channels)
         self.lin = Linear(hidden_channels, output_dim)
 
+    def forward(self, x, edge_index, batch):
+        # 1. Obtain node embeddings
+        x = self.conv1(x, edge_index)
+        x = x.relu()
+        x = self.conv2(x, edge_index)
+        x = x.relu()
+        x = self.conv3(x, edge_index)
+
+        # 2. Readout layer
+        x = global_mean_pool(x, batch) #[batch_size, hidden_channels]
+
+        # 3. Final classifier
+        x = F.dropout(x, p = 0.5, training = self.training)
+        x = self.lin(x)
+
+        return x
+
+# Class for GCN model
+class test_GCN(torch.nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_channels):
+        super().__init__()
+        self.conv1 = GCNConv(input_dim, hidden_channels) ### Things like dataset features can be passed through as arguments. Will probably simplify things. 
+        self.conv2 = GCNConv(hidden_channels, hidden_channels)
+        self.pool = SAGPooling(hidden_channels, hidden_channels)
+        self.conv3 = GCNConv(hidden_channels, hidden_channels)
+        self.lin = Linear(hidden_channels, output_dim)
+
+    def forward(self, x, edge_index, batch):
+        # 1. Obtain node embeddings
+        x = self.conv1(x, edge_index)
+        x = x.relu()
+        x = self.conv2(x, edge_index)
+        x = x.relu()
+        x = self.pool(x, edge_index)
+        x = x.relu()
+        x = self.conv3(x, edge_index)
+
+        # 2. Readout layer
+        x = global_mean_pool(x, batch) #[batch_size, hidden_channels]
+
+        # 3. Final classifier
+        x = F.dropout(x, p = 0.5, training = self.training)
+        x = self.lin(x)
+
+        return x
+
+
+# Class for model with customizable architecture
+class new_GCN(torch.nn.Module):
+    def __init__(self, arch_dict, output_dim):
+        # arch_dict is a list of 2-ples of form [layer, input_channels]
+        super().__init__()
+        self.arch_dict = arch_dict
+        self.architecture = []
+
+        
+        
+        for index in range(0, len(arch_dict)):
+            if index == len(arch_dict) - 1:
+                self.architecture.append(arch_dict[index][0](arch_dict[index][1], output_dim))
+            else:
+                self.architecture.append(arch_dict[index][0](arch_dict[index][1], arch_dict[index + 1][1]))
+        
     def forward(self, x, edge_index, batch):
         # 1. Obtain node embeddings
         x = self.conv1(x, edge_index)
@@ -62,7 +125,7 @@ class GCN_Train():
         print(f"Model moved to {dev}")
 
     # Trains model for one epoch
-    def train(self, train_DL, verbose = False, ignore_es = False):
+    def train_epoch(self, train_DL, verbose = False, ignore_es = False):
         if self.flagraiser == True and ignore_es == False:
             print("Early stopping triggered - are you sure you want to continue?")
             return False
