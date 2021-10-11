@@ -270,7 +270,8 @@ class neighbor_metric_class(InMemoryDataset):
                                           pos = data.pos,
                                           dist_mat = data.dist_mat,
                                           edge_attr = edge_attr,
-                                          name = data.name + '_naive' + str(self.naive_radius)))
+                                          name = data.name,
+                                          nb_met = 'naive_' + str(self.naive_radius)))
             print("Neighbors processed!")
 
         elif self.neighbordef == 'knn':
@@ -291,7 +292,8 @@ class neighbor_metric_class(InMemoryDataset):
                                     y = data.y,
                                     edge_index = edge_tensor,
                                     pos = data.pos,
-                                    name = data.name + '_naive' + str(25)))
+                                    name = data.name,
+                                    nb_met = 'knn'))
                 print("Neighbors processed!")
                                     
         
@@ -372,7 +374,8 @@ class HIV_neighbor_metric_class(InMemoryDataset):
                                           pos = data.pos,
                                           dist_mat = data.dist_mat,
                                           edge_attr = edge_attr,
-                                          name = data.name + '_naive' + str(self.naive_radius)))
+                                          name = data.name,
+                                          nb_met = 'naive_' + str(self.naive_radius)))
                 counter += 1
 
         elif self.neighbordef == 'knn':
@@ -393,7 +396,8 @@ class HIV_neighbor_metric_class(InMemoryDataset):
                                     y = data.y,
                                     edge_index = edge_tensor,
                                     pos = data.pos,
-                                    name = data.name + '_naive' + str(25)))
+                                    name = data.name,
+                                    nb_met = 'knn'))
                                     
         
         data, slices = self.collate(new_neighbors)
@@ -517,7 +521,9 @@ class NSCLC_Dataset(InMemoryDataset):
                                                 y = pt_data.y,
                                                 edge_index = subgraph_edges,
                                                 pos = subgraph_pos,
-                                                name = pt_data.name + '_Sub' + str(p)))
+                                                name = pt_data.name,
+                                                nb_met = pt_data.nb_met,
+                                                subgraph = 'Sub_' + str(p)))
 
                 print(f"Graph {k} of {len(dataset)} processed")
             print("Subgraphs completed!")
@@ -565,6 +571,7 @@ class NSCLC_Dataset(InMemoryDataset):
                                                  pos = pos,
                                                  edge_attr = edge_attr,
                                                  name = data.name,
+                                                 nb_met = data.nb_met,
                                                  win_num = str(counter)))
                     counter += 1
                 
@@ -690,7 +697,9 @@ class HIV_Dataset(InMemoryDataset):
                                                 y = pt_data.y,
                                                 edge_index = subgraph_edges,
                                                 pos = subgraph_pos,
-                                                name = pt_data.name + '_Sub' + str(p)))
+                                                name = pt_data.name,
+                                                nb_met = pt_data.nb_met,
+                                                subgraph = 'Sub_' + str(p)))
 
                 print(f"Graph {k} of {len(dataset)} processed")
         elif self.subgraph == 'windows':
@@ -737,6 +746,7 @@ class HIV_Dataset(InMemoryDataset):
                                                  pos = pos,
                                                  name = data.name,
                                                  edge_attr = edge_attr,
+                                                 nb_met = data.nb_met,
                                                  win_num = str(counter)))
                     counter += 1
                 
