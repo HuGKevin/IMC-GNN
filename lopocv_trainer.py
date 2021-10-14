@@ -37,13 +37,13 @@ class LOPOCV():
         Loads model from file, (usually will be directory/lopo$(patient).mdl)
         '''
         ###TODO MODEL LOAD FUNC
-        self.model_trainers[patient] = self.model_trainers[patient].load(file)
+        self.model_trainers[patient].load_model(file)
         
     def load_all_models_from_dir(self, direc):
         '''
         Load all models from directory, files in format lopo$(patient).mdl
         '''
-        for patient in self.model_trainers:
+        for patient in self.patient_list:
             self.load_model_into_pos(direc + 'lopo'+str(patient)+'.mdl', patient)
     
     def train(self, save_dir = None, verbose=False):
@@ -98,7 +98,7 @@ class LOPOCV():
         Validate all models on their respective leave one out patients, and aggregate if needed
         '''
         scores = dict()
-        for patient in self.test_loaders:
+        for patient in self.patient_list:
             if verbose:
                 print("Leaving patient", patient, "out")
             
