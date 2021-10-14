@@ -3,7 +3,7 @@ import torch
 from models import GCN, GCN_Train
 import copy
 
-from torch_geometric.data import Data, Dataset, DataLoader, batch, Subset
+from torch_geometric.data import Data, Dataset, DataLoader, batch
 
 class LOPOCV():
     
@@ -12,24 +12,24 @@ class LOPOCV():
         self.model_trainers = dict()
         self.train_loaders = dict()
         self.test_loaders = dict()
-        self.device_pool = devices
+        self.device = devices
         self.original_model = model
-        
-        for patient,datum in enumerate(dataset):
-            #Get test set
-            test_set = datum
-            
-            #Get training indices for current lopo model
-            train_ind = list(range(len(dataset)))
-            train_ind = train_ind[:patient] + train_ind[patient+1:]
-            
-            train_set = torch.utils.data.Subset(dataset, train_ind)
-            self.train_loaders[patient] = DataLoader(train_set, batch_size=batch_size, shuffle = True)
-            self.test_loaders[patient] = DataLoader(test_set, batch_size=batch_size, shuffle = False)
-            
+
+        self.patient_list = list(set([data.name for data in dataset]))
+
+        for patient in self.patient_list:
+            # Get test set, i.e. all graphs associated with this patient
+            test_set = [data for data in dataset if data.name == patient]
+
+            # Get training set, i.e. all graphs not associated with this patient
+            train_set = [data for data in dataset if data.name != patient]
+
+            # Create DataLoaders for each set
+            self.train_loaders[patient] = DataLoader(train_set, batch_size = batch_size, shuffle = True)
+            self.test_loaders[patient] = DataLoader(test_set, batch_size = batch_size, shuffle = False)
                         
             #create model
-            self.model_trainers[patient] = copy.deepcopy(self.model)
+            self.model_trainers[patient] = copy.deepcopy(self.original_model)
             
     
     def load_model_into_pos(self, file, patient):
@@ -55,7 +55,7 @@ class LOPOCV():
             if save_dir is not None:
                 print("-saving all models to", save_dir, "with naming conv: lopo$(patient).mdl")
             
-        for patient in self.train_loaders:
+        for patient in self.patient_list:
             if verbose:
                 print("Leaving patient", patient, "out")
             
@@ -63,20 +63,22 @@ class LOPOCV():
                 print("---Selecting device and transferring")
                 
             #Pick GPU with largest amount of memory free
-            selected_device = select_freest_device(self.device_pool)
+            # TODO: implement select_freest_device
+            # selected_device = select_freest_device(self.device_pool)
+            selected_device = self.device
             if verbose:
                 print("---Transferred to device", selected_device)
             
             
             ###TODO: edit device transfer
-            self.model_trainers[patient].model.to(selected_device)
+            self.model_trainers[patient].to(selected_device)
             
             if verbose:
                 print("---Starting Train")
                 print()
                 print()
             
-            self.model_trainers[patient].train(self.train_loaders[patient], verbose = verbose)
+            self.model_trainers[patient].train_epoch(self.train_loaders[patient], verbose = verbose)
             
             if verbose:
                 print("---Removing model from device")
@@ -89,7 +91,7 @@ class LOPOCV():
                 print("---Saving model as lopo", patient, ".mdl")
 
             ###TODO: need model save code
-            self.model_trainers[patient].save(save_dir + 'lopo' + patient + '.mdl')
+            self.model_trainers[patient].save_model(save_dir + 'lopo' + patient + '.mdl')
 
     def validate(self, device=None, verbose=False, aggregate_func=None):
         '''
