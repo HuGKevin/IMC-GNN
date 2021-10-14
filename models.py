@@ -114,8 +114,7 @@ class GCN_Train():
 
         if loss_fxn == 'cel':
             self.criterion = torch.nn.CrossEntropyLoss()
-
-            if optimizer == 'adam':
+        if optimizer == 'adam':
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr = lr)
 
         self.flag = EarlyStopFlag(es_thresh, es_lambda, es_min_iter, es_stall_limit)
