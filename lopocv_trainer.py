@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from models import GCN, GCN_Train
 import copy
+from sklearn.metrics import roc_auc_score
 
 from torch_geometric.data import Data, Dataset, DataLoader, batch
 
@@ -12,6 +13,7 @@ class LOPOCV():
         self.model_trainers = dict()
         self.train_loaders = dict()
         self.test_loaders = dict()
+        self.ground_truth = dict()
         self.device = devices
         self.original_model = model
 
@@ -23,6 +25,9 @@ class LOPOCV():
 
             # Get training set, i.e. all graphs not associated with this patient
             train_set = [data for data in dataset if data.name != patient]
+
+            # Get ground truth for the patient
+            self.ground_truth[patient] = test_set[0].y
 
             # Create DataLoaders for each set
             self.train_loaders[patient] = DataLoader(train_set, batch_size = batch_size, shuffle = True)
@@ -98,20 +103,27 @@ class LOPOCV():
         Validate all models on their respective leave one out patients, and aggregate if needed
         '''
         scores = dict()
+        ground_truth = dict()
         for patient in self.patient_list:
             if verbose:
                 print("Leaving patient", patient, "out")
             
             #validate model
             scores[patient] = self.model_trainers[patient].validate(self.test_loaders[patient], verbose = verbose)
-            
+
         #Aggregate (or don't) the scores and return
         if aggregate_func is None:
             return scores
         else:
             if verbose:
                 print("Aggregating scores")
-            return aggregate_func(scores)
+
+            agg_scores = self.aggregate(scores, aggregate_func)
+
+            # Compare aggregate scores against ground truth
+            return roc_auc_score([self.ground_truth[patient] for patient in self.ground_truth.keys()],
+                                 [agg_scores[patient] for patient in agg_scores.keys()])
+            
     
     def predict(self, x, edge_index, device=None, verbose=False, aggregate_func=None):
         '''
@@ -130,4 +142,16 @@ class LOPOCV():
         else:
             if verbose:
                 print("Aggregating predictions")
-            return aggregate_func(preds)
+            return aggregate(preds)
+
+    def aggregate(self, scores, func, verbose = False):
+        '''
+        Aggregates scores from model.validate() such that we can compute a final ROC AUC in validate() or predict()
+        '''
+        if func == 'majority_vote':
+            vals = {patient:np.round(scores[patient]) for patient in scores.keys()}
+        if func == 'logit_regression':
+            vals = 'coming soon...'
+        
+        return(vals)
+
