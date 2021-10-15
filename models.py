@@ -103,12 +103,12 @@ class new_GCN(torch.nn.Module):
 class GCN_Train():
     def __init__(self, 
                  input_dim, output_dim, hidden_channels, 
-                 metrics = 'auc', lr = 0.001, loss_fxn = 'cel', optimizer = 'adam',
+                 metric = 'auc', lr = 0.001, loss_fxn = 'cel', optimizer = 'adam',
                  es_thresh = 0.03, es_lambda = 0.8, es_min_iter = 100, es_stall_limit = 5):
         self.model = GCN(input_dim = input_dim, output_dim = output_dim, hidden_channels = hidden_channels).double()
         self.device = torch.device('cpu')
-                       
-        self.metric = metrics
+
+        self.metric = metric
         self.flagraiser = False
         self.train_acc = [] # Note that validation accuracy is tracked in the flag raiser object
 
@@ -117,7 +117,7 @@ class GCN_Train():
         if optimizer == 'adam':
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr = lr)
 
-        self.flag = EarlyStopFlag(es_thresh, es_lambda, es_min_iter, es_stall_limit)
+        self.flag = EarlyStopFlag(es_thresh, es_lambda, es_min_iter, es_stall_limit, metric = self.metric)
 
     def to(self, dev):
         self.device = torch.device(dev)
@@ -174,14 +174,30 @@ class GCN_Train():
             pred.append(self.predict(data.x, data.edge_index, data.batch))
             true.append(data.y)
 
+        if verbose == True:
+            print('---Predictions complete, computing metrics')
+
         final_pred = torch.cat(pred, dim = 0)
         final_true = torch.cat(true, dim = 0)
 
         if self.metric == 'auc':
+            if verbose == True:
+                print('---Computing ROC AUC')
+                
             score = roc_auc_score(final_true.to(torch.device('cpu')),
                                   final_pred.to(torch.device('cpu')))
             self.flagraiser = self.flag.update(score, verbose = verbose)
 
+        if self.metric == 'accuracy':
+            if verbose == True:
+                print('---Computing accuracy')
+                
+            score = (sum(torch.eq(final_pred, final_true)) / final_pred.shape[0]).item()
+            self.flagraiser = self.flag.update(score, verbose = verbose)
+
+        if verbose == True:
+            print('---Validation complete')
+            
         return score
             
     # Predicts classification based on current model parameters
@@ -221,11 +237,12 @@ class GCN_Train():
 
 
 class EarlyStopFlag():
-    def __init__(self, threshold, lam, minimum_iters, stall_lim, max_mode = False, name = None):
+    def __init__(self, threshold, lam, minimum_iters, stall_lim, metric = 'auc', max_mode = False, name = None):
         self.auc_track = []
         self.ema_track = []
         self.count = 0
-        
+
+        self.__metric__ = metric
         self.__lam__ = lam
         self.__thresh__ = threshold
         self.__minimum_iters__ = minimum_iters
@@ -241,7 +258,7 @@ class EarlyStopFlag():
         self.auc_track.append(new_value)
         
         if verbose == True:
-            print(f"AUC: {new_value}")
+            print(f"{self.__metric__}: {new_value}")
             print(f"Epoch number {self.count + 1}")
 
         if self.count == 0:
