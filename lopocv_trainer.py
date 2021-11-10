@@ -1,6 +1,9 @@
+import sys
+sys.path.append('/home/kevin/project')
+
 import numpy as np
 import torch
-from models import GCN, GCN_Train
+from IMC_GNN.models import GCN, GCN_Train
 import copy
 from sklearn.metrics import roc_auc_score
 
@@ -51,7 +54,7 @@ class LOPOCV():
         for patient in self.patient_list:
             self.load_model_into_pos(direc + 'lopo'+str(patient)+'.mdl', patient)
     
-    def train(self, save_dir = None, verbose=False):
+    def train(self, save_dir = None, ignore_es = False, verbose=False):
         '''
         Train all models on appropriate data from train loaders
         '''
@@ -83,7 +86,7 @@ class LOPOCV():
                 print()
                 print()
             
-            self.model_trainers[patient].train_epoch(self.train_loaders[patient], verbose = verbose)
+            self.model_trainers[patient].train_epoch(self.train_loaders[patient], verbose = verbose, ignore_es = ignore_es)
             
             if verbose:
                 print("---Removing model from device")
@@ -107,9 +110,16 @@ class LOPOCV():
         for patient in self.patient_list:
             if verbose:
                 print("Leaving patient", patient, "out")
+
+            # Move model to device
+            selected_device = self.device
+            self.model_trainers[patient].to(selected_device)
             
             #validate model
             scores[patient] = self.model_trainers[patient].validate(self.test_loaders[patient], verbose = verbose)
+
+            # Move model back to cpu
+            self.model_trainers[patient].model.to('cpu')
 
         #Aggregate (or don't) the scores and return
         if aggregate_func is None:
