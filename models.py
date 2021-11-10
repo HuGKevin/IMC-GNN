@@ -119,10 +119,11 @@ class GCN_Train():
 
         self.flag = EarlyStopFlag(es_thresh, es_lambda, es_min_iter, es_stall_limit, metric = self.metric)
 
-    def to(self, dev):
+    def to(self, dev, verbose = False):
         self.device = torch.device(dev)
         self.model = self.model.to(self.device)
-        print(f"Model moved to {dev}")
+        if verbose:
+            print(f"Model moved to {dev}")
 
     # Trains model for one epoch
     def train_epoch(self, train_DL, verbose = False, ignore_es = False):
@@ -170,6 +171,8 @@ class GCN_Train():
 
         for data in valid_DL:
             if self.device != torch.device('cpu'):
+                if verbose:
+                    print(f'moving data to {self.device}')
                 data = data.to(self.device)
             pred.append(self.predict(data.x, data.edge_index, data.batch))
             true.append(data.y)
