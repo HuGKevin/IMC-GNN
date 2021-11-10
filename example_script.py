@@ -13,6 +13,9 @@ from collections import Counter
 import sys
 import re
 
+# Setup some variables
+save_dir = '/home/kevin/project/NSCLC_final/model_saves/'
+
 # Load datasets
 dataset = ds.NSCLC_Dataset(dataset = 'c2', neighbordef = 'naive', subgraph = 'windows', naive_radius = 25, width = 50, window_num = 100)
 
@@ -20,22 +23,28 @@ dataset = ds.NSCLC_Dataset(dataset = 'c2', neighbordef = 'naive', subgraph = 'wi
 model = md.GCN_Train(33, 2, 16, metric = 'accuracy', es_min_iter=35)
 
 # Instantiate LOPOCV object
-test = lopo.LOPOCV(model = model, dataset = dataset, devices = 'cuda:0', batch_size = 32)
+lopo_trainer = lopo.LOPOCV(model = model, dataset = dataset, devices = 'cuda:0', batch_size = 128)
 
-# Train an epoch
-test.train(save_dir = '/home/kevin/project/NSCLC_final/model_saves/', verbose = True)
+lopo_auc_track = []
+for i in range(0, 35):
+    # Train an epoch
+    lopo_trainer.train(save_dir = save_dir, verbose = True)
 
-# Validate
-test.load_all_models_from_dir('/home/kevin/project/NSCLC_final/model_saves/')
-test.validate(device = 'cuda:0', verbose = True)
+    # Validate
+    lopo_auc_track.append(lopo_trainer.validate(device = 'cuda:0', verbose = False, aggregate_func = 'majority_vote'))
 
-# Loading models for backup
-# direc = '/home/kevin/project/NSCLC_final/model_saves/'
-# file = direc + 'lopo' + str(patient2) + '.mdl'
-test.load_all_models_from_dir('/home/kevin/project/NSCLC_final/model_saves/')
+# Pull out all the statistics
+for patient in lopo_trainer.patient_list:
+    tracker = pd.DataFrame(data = {'training':lopo_trainer.model_trainers[patient].train_acc,
+                                   'validation':lopo_trainer.model_trainers[patient].flag.auc_track})
 
-# Visualize everything
+    tracker.to_csv(save_dir + 'lopo' + patient + 'tracker.csv')
+    
+final_auc = pd.DataFrame(data = {'epoch':range(0,35),
+                                 'auc':lopo_auc_track})
+final_auc.to_csv(save_dir + 'overall_auc.csv')
 
+# Visualize results?
 
 
 
