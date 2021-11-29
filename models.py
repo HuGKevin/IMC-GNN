@@ -205,8 +205,10 @@ class GCN_Train():
             
     # Predicts classification based on current model parameters
     def predict(self, x, edge_index, batch):
+        self.model.eval()
         out = self.model(x, edge_index, batch)
-        pred = out.argmax(dim = 1)
+        m = torch.nn.Softmax(dim = 1)
+        pred = m(out)[:,1]
         return pred
 
     # Same as valid() but doesn't update any metric trackers.
