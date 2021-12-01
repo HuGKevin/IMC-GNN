@@ -116,14 +116,23 @@ class LOPOCV():
             self.model_trainers[patient].to(selected_device)
             
             #validate model
-            scores[patient] = self.model_trainers[patient].validate(self.test_loaders[patient], verbose = verbose)
-
+            for data in self.test_loaders[patient]:
+                data.to(selected_device)
+                scores[patient] = self.model_trainers[patient].predict(data.x, data.edge_index, data.batch)
+                        
             # Move model back to cpu
             self.model_trainers[patient].model.to('cpu')
+
+            # Get ground truth in there
+            ground_truth[patient] = self.ground_truth[patient].repeat(len(scores[patient]))
 
         #Aggregate (or don't) the scores and return
         if aggregate_func is None:
             return scores
+        elif aggregate_func == 'AUC':
+            final_scores = torch.cat(list(scores.values()), dim = 0).to('cpu').detach()
+            final_truth = torch.cat(list(ground_truth.values()), dim = 0)
+            return roc_auc_score(final_truth, final_scores)
         else:
             if verbose:
                 print("Aggregating scores")

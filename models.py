@@ -208,7 +208,7 @@ class GCN_Train():
         self.model.eval()
         out = self.model(x, edge_index, batch)
         m = torch.nn.Softmax(dim = 1)
-        pred = m(out)[:,1]
+        pred = m(out)[:,1].detach()
         return pred
 
     # Same as valid() but doesn't update any metric trackers.
